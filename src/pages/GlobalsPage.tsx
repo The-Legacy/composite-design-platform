@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router";
 import EquationSheet, { useEvaluation } from "../components/EquationSheet";
 import { Card, Input } from "../components/ui";
+import { RecentChanges } from "../components/VariableHistory";
 import { useProjectCtx } from "./projectContext";
 
 export default function GlobalsPage() {
@@ -17,6 +18,7 @@ export default function GlobalsPage() {
       </div>
       <EquationSheet projectId={project.id} partId={null} canEdit={canEdit} />
       <AllVariables projectId={project.id} />
+      <RecentChanges projectId={project.id} />
     </div>
   );
 }

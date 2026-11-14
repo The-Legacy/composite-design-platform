@@ -5,6 +5,7 @@ import { PART_STATUSES, type Part } from "../lib/types";
 import { Button, Select } from "../components/ui";
 import FilePanel from "../components/FilePanel";
 import EquationSheet from "../components/EquationSheet";
+import LayupPanel from "../components/LayupPanel";
 import InlineEdit from "../components/InlineEdit";
 import { useProjectCtx } from "./projectContext";
 
@@ -72,6 +73,8 @@ export default function PartPage() {
         </div>
       </div>
 
+      <LayupPanel part={part} canEdit={canEdit} />
+
       <EquationSheet projectId={project.id} partId={part.id} canEdit={canEdit} />
 
       <FilePanel title="Drawings, models & files" placement={{ project_id: project.id, part_id: part.id }} files={partFiles} canEdit={canEdit} />
@@ -82,7 +85,7 @@ export default function PartPage() {
             variant="danger"
             size="sm"
             onClick={async () => {
-              if (!confirm(`Delete part “${part.name}” with its ${partFiles.length} files and all its variables? Formulas in other parts that use ${part.slug}.* will show errors.`)) return;
+              if (!confirm(`Delete part “${part.name}” with its ${partFiles.length} files (all revisions), layup and variables? Formulas in other parts that use ${part.slug}.* will show errors.`)) return;
               await deleteFiles(partFiles.map((f) => f.id));
               await remove.mutateAsync(part.id);
               navigate(`/p/${project.id}/s/${part.subsystem_id}`);

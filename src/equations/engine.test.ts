@@ -65,7 +65,7 @@ describe("evaluateProject", () => {
     const c = v(null, "c", "spar_cap.nope");
     const r = evaluateProject([a, b, c], parts);
     expect(r.get(a.id)!.error).toMatch(/Unknown variable or unit “foo”/);
-    expect(r.get(b.id)!.error).toMatch(/Unknown part “wing”/);
+    expect(r.get(b.id)!.error).toMatch(/Unknown part or material “wing”/);
     expect(r.get(c.id)!.error).toMatch(/no variable “nope”/);
   });
 

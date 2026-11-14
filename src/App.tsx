@@ -9,6 +9,8 @@ import SubsystemPage from "./pages/SubsystemPage";
 import PartPage from "./pages/PartPage";
 import GlobalsPage from "./pages/GlobalsPage";
 import SettingsPage from "./pages/SettingsPage";
+import MaterialsPage from "./pages/MaterialsPage";
+import RollupPage from "./pages/RollupPage";
 import { Spinner } from "./components/ui";
 
 export default function App() {
@@ -33,6 +35,8 @@ export default function App() {
         <Route index element={<ProjectOverview />} />
         <Route path="globals" element={<GlobalsPage />} />
         <Route path="settings" element={<SettingsPage />} />
+        <Route path="materials" element={<MaterialsPage />} />
+        <Route path="rollup" element={<RollupPage />} />
         <Route path="s/:subsystemId" element={<SubsystemPage />} />
         <Route path="part/:partId" element={<PartPage />} />
       </Route>

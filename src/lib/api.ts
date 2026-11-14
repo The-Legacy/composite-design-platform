@@ -30,7 +30,7 @@ export interface Placement {
 export async function uploadFile(
   file: File,
   placement: Placement,
-  opts: { kind?: FileKind; revision?: string; onProgress?: (fraction: number) => void } = {},
+  opts: { kind?: FileKind; revision?: string; replaces?: string; onProgress?: (fraction: number) => void } = {},
 ): Promise<FileRow> {
   const headers = await authHeader();
   const params = new URLSearchParams({ project_id: placement.project_id, name: file.name });
@@ -38,6 +38,7 @@ export async function uploadFile(
   if (placement.part_id) params.set("part_id", placement.part_id);
   if (opts.kind) params.set("kind", opts.kind);
   if (opts.revision) params.set("revision", opts.revision);
+  if (opts.replaces) params.set("replaces", opts.replaces);
 
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
@@ -79,12 +80,12 @@ export async function deleteFile(fileId: string) {
   await check(await fetch(`/api/files/${fileId}`, { method: "DELETE", headers: await authHeader() }));
 }
 
-export async function importFromDrive(fileId: string, googleAccessToken: string, placement: Placement): Promise<FileRow> {
+export async function importFromDrive(fileId: string, googleAccessToken: string, placement: Placement, replaces?: string): Promise<FileRow> {
   const res = await check(
     await fetch("/api/drive/import", {
       method: "POST",
       headers: { ...(await authHeader()), "Content-Type": "application/json" },
-      body: JSON.stringify({ ...placement, file_id: fileId, google_access_token: googleAccessToken }),
+      body: JSON.stringify({ ...placement, file_id: fileId, google_access_token: googleAccessToken, replaces }),
     }),
   );
   return res.json();

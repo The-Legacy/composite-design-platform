@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { NavLink, Outlet, useNavigate, useParams } from "react-router";
 import {
+  useMaterials,
   useMyRole,
   useParts,
   useProject,
@@ -10,6 +11,7 @@ import {
 } from "../data/queries";
 import { Button, ErrorText, Field, Input, Modal, Select, Spinner, cx, slugify } from "../components/ui";
 import TopBar from "../components/TopBar";
+import SearchPalette from "../components/SearchPalette";
 import type { Part, Subsystem } from "../lib/types";
 import type { ProjectCtx } from "./projectContext";
 
@@ -52,7 +54,14 @@ export default function ProjectLayout() {
       <TopBar>
         <span className="font-medium text-slate-800">{project.data.name}</span>
         {role && <span className="ml-2 rounded bg-slate-100 px-1.5 py-0.5 text-xs">{role}</span>}
+        <button
+          onClick={() => window.dispatchEvent(new Event("open-search"))}
+          className="ml-4 inline-flex items-center gap-2 rounded-md border border-slate-200 px-2.5 py-1 text-xs text-slate-500 hover:border-slate-300 hover:text-slate-700"
+        >
+          Search <kbd className="rounded bg-slate-100 px-1 font-sans text-[10px]">Ctrl K</kbd>
+        </button>
       </TopBar>
+      <SearchPalette projectId={projectId} parts={ctx.parts} subsystems={ctx.subsystems} />
       <div className="flex min-h-0 flex-1">
         <aside className="flex w-64 shrink-0 flex-col border-r border-slate-200 bg-white">
           <nav className="flex-1 space-y-0.5 overflow-auto p-3">
@@ -61,6 +70,12 @@ export default function ProjectLayout() {
             </NavLink>
             <NavLink to={`/p/${projectId}/globals`} className={navCls}>
               Project variables
+            </NavLink>
+            <NavLink to={`/p/${projectId}/materials`} className={navCls}>
+              Materials
+            </NavLink>
+            <NavLink to={`/p/${projectId}/rollup`} className={navCls}>
+              Mass &amp; BOM
             </NavLink>
             <NavLink to={`/p/${projectId}/settings`} className={navCls}>
               Team &amp; settings
@@ -178,6 +193,7 @@ function NewPartModal({
   defaultSubsystem?: string;
 }) {
   const { create } = useTableMutations<Part>("parts", projectId);
+  const materials = useMaterials(projectId).data ?? [];
   const navigate = useNavigate();
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
@@ -186,7 +202,7 @@ function NewPartModal({
   const [subsystemId, setSubsystemId] = useState<string>("");
   const sid = subsystemId || defaultSubsystem || "";
   const effSlug = slugTouched ? slug : slugify(name);
-  const slugTaken = parts.some((p) => p.slug === effSlug);
+  const slugTaken = parts.some((p) => p.slug === effSlug) || materials.some((m) => m.slug === effSlug);
   const slugValid = /^[A-Za-z][A-Za-z0-9_]*$/.test(effSlug);
 
   const reset = () => {
@@ -232,7 +248,7 @@ function NewPartModal({
           label="Equation ID"
           hint={
             slugTaken ? (
-              <span className="text-red-600">Another part already uses this ID</span>
+              <span className="text-red-600">Another part or material already uses this ID</span>
             ) : (
               <>
                 Other parts reference this part's variables as <code className="font-mono">{effSlug || "id"}.variable</code>

@@ -6,6 +6,8 @@
  *
  *   - bare name `t_ply`        → variable on the same part, else a project global
  *   - qualified `spar_cap.t_ply` → variable `t_ply` on the part whose slug is `spar_cap`
+ *   - qualified `T700.E1`      → property of the material whose slug is `T700`
+ *   - bare `layup_t` inside a part → a value computed from that part's ply layup
  *
  * Units are handled by mathjs, so `E1 * t_ply` yields `GPa mm`, and a display unit
  * like `kN/mm` converts the result. Results are recomputed for the whole project in
@@ -101,7 +103,18 @@ interface Compiled {
   deps: string[];
 }
 
-export function evaluateProject(vars: VarInput[], parts: PartRef[]): Map<string, VarResult> {
+/** Values computed outside the sheet (materials library, layup analysis). */
+export interface EvalExtras {
+  /** material slug → properties with units, referenced as slug.prop */
+  materials?: Map<string, Record<string, unknown>>;
+  /** part id → computed values (e.g. layup_t), usable by bare name on that part or as slug.name */
+  partValues?: Map<string, Record<string, unknown>>;
+}
+
+export function evaluateProject(vars: VarInput[], parts: PartRef[], extras: EvalExtras = {}): Map<string, VarResult> {
+  const materials = extras.materials ?? new Map<string, Record<string, unknown>>();
+  const partValues = extras.partValues ?? new Map<string, Record<string, unknown>>();
+  const has = (o: Record<string, unknown> | undefined, k: string) => !!o && Object.prototype.hasOwnProperty.call(o, k);
   const partById = new Map(parts.map((p) => [p.id, p]));
   const partBySlug = new Map(parts.map((p) => [p.slug, p]));
   const key = (partId: string | null, name: string) => `${partId ?? "$global"}::${name}`;
@@ -121,22 +134,31 @@ export function evaluateProject(vars: VarInput[], parts: PartRef[]): Map<string,
         if (r.kind === "qualified") {
           const part = partBySlug.get(r.slug);
           if (!part) {
-            // could be something like `x.y` on a non-part; treat as unknown
-            throw new Error(`Unknown part “${r.slug}” (use a part's equation id, e.g. spar_cap.t_ply)`);
+            const mat = materials.get(r.slug);
+            if (mat) {
+              if (!has(mat, r.name))
+                throw new Error(`Material “${r.slug}” has no value for “${r.name}” (has: ${Object.keys(mat).join(", ") || "nothing yet"})`);
+              continue;
+            }
+            throw new Error(`Unknown part or material “${r.slug}” (e.g. spar_cap.t_ply or T700.E1)`);
           }
           const target = byKey.get(key(part.id, r.name));
-          if (!target) throw new Error(`Part “${r.slug}” has no variable “${r.name}”`);
-          deps.add(target.id);
+          if (target) deps.add(target.id);
+          else if (!has(partValues.get(part.id), r.name)) throw new Error(`Part “${r.slug}” has no variable “${r.name}”`);
         } else {
           // A part variable named like a global may reference that global, e.g. part `E = 1.1 * E`.
           let own = v.partId ? byKey.get(key(v.partId, r.name)) : undefined;
           if (own?.id === v.id) own = undefined;
           const target = own ?? byKey.get(key(null, r.name));
           if (target?.id === v.id) throw new Error("A variable can't reference itself");
-          if (target) {
+          if (!own && v.partId && has(partValues.get(v.partId), r.name)) {
+            // computed part value (e.g. layup_t); takes precedence over a global of the same name
+          } else if (target) {
             deps.add(target.id);
           } else if (partBySlug.has(r.name)) {
             throw new Error(`“${r.name}” is a part — reference one of its variables, e.g. ${r.name}.x`);
+          } else if (materials.has(r.name)) {
+            throw new Error(`“${r.name}” is a material — reference one of its properties, e.g. ${r.name}.E1`);
           } else if (!isBuiltin(r.name)) {
             throw new Error(`Unknown variable or unit “${r.name}”`);
           }
@@ -176,9 +198,10 @@ export function evaluateProject(vars: VarInput[], parts: PartRef[]): Map<string,
   // 3. Evaluate in order
   const values = new Map<string, unknown>();
   const globalScope: Record<string, unknown> = {};
-  const partScopes = new Map<string, Record<string, unknown>>(parts.map((p) => [p.id, {}]));
+  const partScopes = new Map<string, Record<string, unknown>>(parts.map((p) => [p.id, { ...partValues.get(p.id) }]));
   const slugScope: Record<string, unknown> = {};
-  for (const p of parts) slugScope[p.slug] = partScopes.get(p.id);
+  for (const [slug, props] of materials) slugScope[slug] = props;
+  for (const p of parts) slugScope[p.slug] = partScopes.get(p.id); // parts win over a material with the same slug
 
   const results = new Map<string, VarResult>();
   for (const id of order) {

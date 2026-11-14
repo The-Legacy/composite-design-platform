@@ -84,29 +84,56 @@ function safeName(name: string) {
   return cleaned || "file";
 }
 
+type Lineage = { lineage_id: string; rev_number: number };
+
+/**
+ * When `replaces` names an existing file, the new upload becomes the next revision of it:
+ * same lineage and same placement (project/subsystem/part) as the file it replaces.
+ */
+async function resolveRevision(db: SupabaseClient, replaces: string | null, p: Placement): Promise<{ placement: Placement; lineage?: Lineage }> {
+  if (!replaces) return { placement: p };
+  if (!/^[0-9a-f-]{36}$/.test(replaces)) throw new HttpError(400, "bad replaces id");
+  const { data: prev } = await db.from("files").select("project_id, subsystem_id, part_id, lineage_id").eq("id", replaces).maybeSingle();
+  if (!prev) throw new HttpError(404, "The file you're replacing no longer exists");
+  if (prev.project_id !== p.project_id) throw new HttpError(400, "That file belongs to a different project");
+  const { data: top } = await db
+    .from("files")
+    .select("rev_number")
+    .eq("lineage_id", prev.lineage_id)
+    .order("rev_number", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return {
+    placement: { project_id: prev.project_id, subsystem_id: prev.subsystem_id, part_id: prev.part_id },
+    lineage: { lineage_id: prev.lineage_id, rev_number: (top?.rev_number ?? 0) + 1 },
+  };
+}
+
 /** Insert the metadata row first: RLS rejects it if the user can't edit the project. */
 async function createFileRow(
   db: SupabaseClient,
   p: Placement,
   fields: { name: string; kind: FileKind; mime_type: string; size_bytes: number; source: "upload" | "drive"; drive_file_id?: string; drive_url?: string; revision?: string },
+  lineage?: Lineage,
 ) {
   const r2_key = `projects/${p.project_id}/${crypto.randomUUID()}/${fields.name}`;
   const { data, error } = await db
     .from("files")
-    .insert({ ...p, ...fields, r2_key })
+    .insert({ ...p, ...fields, ...lineage, r2_key })
     .select()
     .single();
   if (error) {
-    // 42501 = RLS violation; 23503 = bad foreign key (part/subsystem not in this project)
+    // 42501 = RLS violation; 23503 = bad foreign key (part/subsystem not in this project); 23505 = duplicate rev
     if (error.code === "42501") throw new HttpError(403, "You don't have edit access to this project");
     if (error.code === "23503") throw new HttpError(400, "Subsystem/part does not belong to this project");
+    if (error.code === "23505") throw new HttpError(409, "Someone else uploaded a revision of this file at the same time — try again");
     throw new HttpError(400, error.message);
   }
   return data as { id: string; r2_key: string };
 }
 
 async function uploadFile(request: Request, url: URL, env: Env, db: SupabaseClient) {
-  const placement = parsePlacement(url.searchParams);
+  const { placement, lineage } = await resolveRevision(db, url.searchParams.get("replaces"), parsePlacement(url.searchParams));
   const name = safeName(url.searchParams.get("name") ?? "");
   const kindParam = url.searchParams.get("kind");
   const kind = isFileKind(kindParam) ? kindParam : guessKind(name);
@@ -124,7 +151,7 @@ async function uploadFile(request: Request, url: URL, env: Env, db: SupabaseClie
     size_bytes: size,
     source: "upload",
     revision: url.searchParams.get("revision") ?? "",
-  });
+  }, lineage);
 
   try {
     await env.FILES.put(row.r2_key, request.body, { httpMetadata: { contentType: mime } });
@@ -182,7 +209,11 @@ async function bulkDelete(request: Request, env: Env, db: SupabaseClient) {
 async function importFromDrive(request: Request, env: Env, db: SupabaseClient) {
   const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
   if (!body) throw new HttpError(400, "JSON body required");
-  const placement = parsePlacement({ get: (k) => (typeof body[k] === "string" ? (body[k] as string) : null) });
+  const { placement, lineage } = await resolveRevision(
+    db,
+    typeof body.replaces === "string" ? body.replaces : null,
+    parsePlacement({ get: (k) => (typeof body[k] === "string" ? (body[k] as string) : null) }),
+  );
   const fileId = String(body.file_id ?? "");
   const googleToken = String(body.google_access_token ?? "");
   if (!/^[\w-]+$/.test(fileId) || !googleToken) throw new HttpError(400, "file_id and google_access_token are required");
@@ -234,7 +265,7 @@ async function importFromDrive(request: Request, env: Env, db: SupabaseClient) {
     source: "drive",
     drive_file_id: meta.id,
     drive_url: meta.webViewLink,
-  });
+  }, lineage);
 
   try {
     await env.FILES.put(row.r2_key, payload, { httpMetadata: { contentType: mime } });

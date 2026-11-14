@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase, unwrap } from "../lib/supabase";
-import type { FileRow, Invite, Member, Part, Project, Role, Subsystem, Variable } from "../lib/types";
+import type { FileRow, Invite, LayupPly, Material, Member, Part, Project, Role, Subsystem, Variable, VariableChange } from "../lib/types";
 import { useAuth } from "../auth/AuthProvider";
 
 export const qk = {
@@ -13,6 +13,9 @@ export const qk = {
   parts: (id: string) => ["parts", id] as const,
   files: (id: string) => ["files", id] as const,
   variables: (id: string) => ["variables", id] as const,
+  materials: (id: string) => ["materials", id] as const,
+  layup_plies: (id: string) => ["layup_plies", id] as const,
+  history: (id: string) => ["history", id] as const,
 };
 
 // ── Projects ───────────────────────────────────────────────────
@@ -141,6 +144,40 @@ export function useVariables(projectId: string) {
   });
 }
 
+export function useMaterials(projectId: string) {
+  return useQuery({
+    queryKey: qk.materials(projectId),
+    queryFn: async () => unwrap(await supabase.from("materials").select("*").eq("project_id", projectId).order("name")) as Material[],
+  });
+}
+
+export function useLayupPlies(projectId: string) {
+  return useQuery({
+    queryKey: qk.layup_plies(projectId),
+    queryFn: async () =>
+      unwrap(await supabase.from("layup_plies").select("*").eq("project_id", projectId).order("position").order("created_at")) as LayupPly[],
+  });
+}
+
+/** Recent variable changes in the project, newest first (optionally for one variable). */
+export function useVariableHistory(projectId: string, opts: { variableId?: string; limit?: number; enabled?: boolean } = {}) {
+  const { variableId, limit = 100, enabled = true } = opts;
+  return useQuery({
+    queryKey: [...qk.history(projectId), variableId ?? "all", limit],
+    enabled,
+    queryFn: async () => {
+      let q = supabase
+        .from("variable_history")
+        .select("*, profiles(full_name, email)")
+        .eq("project_id", projectId)
+        .order("changed_at", { ascending: false })
+        .limit(limit);
+      if (variableId) q = q.eq("variable_id", variableId);
+      return unwrap(await q) as unknown as VariableChange[];
+    },
+  });
+}
+
 /** Live updates: when a teammate changes anything in this project, refetch it. */
 export function useProjectRealtime(projectId: string) {
   const qc = useQueryClient();
@@ -150,6 +187,9 @@ export function useProjectRealtime(projectId: string) {
       ["parts", qk.parts(projectId)],
       ["files", qk.files(projectId)],
       ["variables", qk.variables(projectId)],
+      ["materials", qk.materials(projectId)],
+      ["layup_plies", qk.layup_plies(projectId)],
+      ["variable_history", qk.history(projectId)],
     ];
     let channel = supabase.channel(`project:${projectId}`);
     for (const [table, key] of tables) {
@@ -167,7 +207,7 @@ export function useProjectRealtime(projectId: string) {
 }
 
 // ── Generic CRUD helpers for content tables ────────────────────
-type Table = "subsystems" | "parts" | "variables" | "files";
+type Table = "subsystems" | "parts" | "variables" | "files" | "materials" | "layup_plies";
 
 export function useTableMutations<T extends { id: string }>(table: Table, projectId: string) {
   const qc = useQueryClient();
@@ -177,7 +217,10 @@ export function useTableMutations<T extends { id: string }>(table: Table, projec
     create: useMutation({
       mutationFn: async (row: Partial<T>) =>
         unwrap(await supabase.from(table).insert({ ...row, project_id: projectId }).select().single()) as T,
-      onSuccess: refresh,
+      onSuccess: () => {
+        refresh();
+        if (table === "variables") qc.invalidateQueries({ queryKey: qk.history(projectId) });
+      },
     }),
     update: useMutation({
       mutationFn: async ({ id, ...patch }: Partial<T> & { id: string }) =>
@@ -190,7 +233,10 @@ export function useTableMutations<T extends { id: string }>(table: Table, projec
         return { prev };
       },
       onError: (_e, _v, ctx) => ctx?.prev && qc.setQueryData(key, ctx.prev),
-      onSettled: refresh,
+      onSettled: () => {
+        refresh();
+        if (table === "variables") qc.invalidateQueries({ queryKey: qk.history(projectId) });
+      },
     }),
     remove: useMutation({
       mutationFn: async (id: string) => unwrap(await supabase.from(table).delete().eq("id", id)),

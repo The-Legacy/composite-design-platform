@@ -1,7 +1,7 @@
 import { Link } from "react-router";
 import { useFiles, useVariables } from "../data/queries";
 import { Card, EmptyState } from "../components/ui";
-import FilePanel from "../components/FilePanel";
+import FilePanel, { groupRevisions } from "../components/FilePanel";
 import { useProjectCtx } from "./projectContext";
 
 export default function ProjectOverview() {
@@ -22,7 +22,7 @@ export default function ProjectOverview() {
             <b className="text-slate-800">{parts.length}</b> parts
           </span>
           <span>
-            <b className="text-slate-800">{files.length}</b> files
+            <b className="text-slate-800">{groupRevisions(files).length}</b> files
           </span>
           <span>
             <b className="text-slate-800">{vars.length}</b> variables

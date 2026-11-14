@@ -2,6 +2,8 @@ import { useMemo, useState, type KeyboardEvent } from "react";
 import katex from "katex";
 import { evaluateProject, isValidIdentifier, toTex, type VarResult } from "../equations/engine";
 import { useParts, useTableMutations, useVariables } from "../data/queries";
+import { useComposites } from "../data/composites";
+import VariableHistory from "./VariableHistory";
 import type { Part, Variable } from "../lib/types";
 import { Button, Card, ErrorText, cx } from "./ui";
 
@@ -11,13 +13,15 @@ type Draft = Partial<Pick<Variable, "name" | "expression" | "display_unit" | "de
 export function useEvaluation(projectId: string, drafts?: Map<string, Draft>) {
   const vars = useVariables(projectId);
   const parts = useParts(projectId);
+  const { partValues, materialScopes } = useComposites(projectId);
   const results = useMemo(() => {
     const list = (vars.data ?? []).map((v) => ({ ...v, ...drafts?.get(v.id) }));
     return evaluateProject(
       list.map((v) => ({ id: v.id, partId: v.part_id, name: v.name, expression: v.expression, displayUnit: v.display_unit })),
       (parts.data ?? []).map((p) => ({ id: p.id, slug: p.slug, name: p.name })),
+      { partValues, materials: materialScopes },
     );
-  }, [vars.data, parts.data, drafts]);
+  }, [vars.data, parts.data, drafts, partValues, materialScopes]);
   return { vars, parts, results };
 }
 
@@ -42,6 +46,7 @@ export default function EquationSheet({
   const { vars, parts, results } = useEvaluation(projectId, drafts);
   const { create, update, remove } = useTableMutations<Variable>("variables", projectId);
   const [hovered, setHovered] = useState<string | null>(null);
+  const [historyFor, setHistoryFor] = useState<Variable | null>(null);
 
   const allVars = vars.data ?? [];
   const partById = useMemo(() => new Map((parts.data ?? []).map((p) => [p.id, p])), [parts.data]);
@@ -109,7 +114,7 @@ export default function EquationSheet({
               <th className="w-44 px-3 py-2 font-medium">Result</th>
               <th className="w-24 px-3 py-2 font-medium">Show in</th>
               <th className="w-56 px-3 py-2 font-medium">Notes</th>
-              <th className="w-8" />
+              <th className="w-16" />
             </tr>
           </thead>
           <tbody>
@@ -177,7 +182,14 @@ export default function EquationSheet({
                   <td className="px-3 py-1.5">
                     <CellInput {...inputProps("description")} placeholder="—" />
                   </td>
-                  <td className="py-1.5 pr-2">
+                  <td className="py-1.5 pr-2 whitespace-nowrap">
+                    <button
+                      className="rounded p-1 text-slate-300 hover:bg-slate-100 hover:text-slate-700"
+                      title="Change history"
+                      onClick={() => setHistoryFor(v)}
+                    >
+                      ⟲
+                    </button>
                     {canEdit && (
                       <button
                         className="rounded p-1 text-slate-300 hover:bg-red-50 hover:text-red-600"
@@ -205,6 +217,13 @@ export default function EquationSheet({
       </div>
       {!rows.length && !canEdit && <div className="p-6 text-center text-sm text-slate-500">No variables yet.</div>}
       <Help partSlug={thisPart?.slug} otherParts={(parts.data ?? []).filter((p) => p.id !== partId)} />
+      <VariableHistory
+        projectId={projectId}
+        variable={historyFor}
+        canEdit={canEdit}
+        onClose={() => setHistoryFor(null)}
+        onRestore={(expression, display_unit) => historyFor && update.mutate({ id: historyFor.id, expression, display_unit })}
+      />
     </Card>
   );
 }
@@ -299,7 +318,21 @@ function Help({ partSlug, otherParts }: { partSlug?: string; otherParts: Part[] 
             <li>“Show in” converts the result, e.g. a stress in <code className="font-mono">MPa</code> or a length in <code className="font-mono">in</code>.</li>
           </ul>
           <ul className="space-y-1">
-            <li>Bare names resolve to this sheet first, then project variables.</li>
+            <li>Bare names resolve to this sheet first, then the part's layup values, then project variables.</li>
+            <li>
+              Materials: <code className="font-mono">T700.E1</code>, <code className="font-mono">T700.t_ply</code>,{" "}
+              <code className="font-mono">T700.rho</code> (see the Materials page).
+            </li>
+            {partSlug && (
+              <li>
+                Layup: <code className="font-mono">layup_t</code>, <code className="font-mono">layup_areal_mass</code>,{" "}
+                <code className="font-mono">layup_Ex</code>, <code className="font-mono">layup_D11</code>…
+              </li>
+            )}
+            <li>
+              Rollups: a part variable named <code className="font-mono">mass</code>, <code className="font-mono">cost</code> or{" "}
+              <code className="font-mono">qty</code> feeds the project mass &amp; BOM table.
+            </li>
             {partSlug && (
               <li>
                 Other parts reference this one as <code className="font-mono">{partSlug}.name</code>.

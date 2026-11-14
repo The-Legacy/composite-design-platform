@@ -1,0 +1,22 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "composite-design-platform",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-11-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+  "assets": {
+    // SPA: unknown paths fall back to index.html; /api/* always hits the Worker.
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
+  "r2_buckets": [
+    { "binding": "FILES", "bucket_name": "composite-design-files" }
+  ],
+  "vars": {
+    // Public values (same ones the frontend uses). Not secrets.
+    "SUPABASE_URL": "https://YOUR-PROJECT.supabase.co",
+    "SUPABASE_ANON_KEY": "YOUR-SUPABASE-PUBLISHABLE-OR-ANON-KEY",
+    "MAX_UPLOAD_MB": "95"
+  }
+}

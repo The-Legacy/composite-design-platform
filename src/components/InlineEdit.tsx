@@ -23,7 +23,7 @@ export default function InlineEdit({
     if (v !== value) onSave(v);
   };
   const cls = cx(
-    "w-full rounded-md border border-transparent bg-transparent px-1.5 py-0.5 -mx-1.5 outline-none hover:border-slate-200 focus:border-accent focus:bg-white disabled:hover:border-transparent",
+    "-mx-1.5 w-[calc(100%+0.75rem)] rounded-md border border-transparent bg-transparent px-1.5 py-0.5 outline-none transition placeholder:text-slate-400 hover:bg-slate-100/70 focus:border-accent focus:bg-white focus:ring-3 focus:ring-accent/15 disabled:hover:bg-transparent",
     className,
   );
   return multiline ? (

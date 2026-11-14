@@ -5,7 +5,8 @@ import { useFiles, useInvites, useMemberMutations, useMembers, useUpdateProject 
 import { deleteFiles } from "../lib/api";
 import { supabase, unwrap } from "../lib/supabase";
 import type { Role } from "../lib/types";
-import { Button, Card, ErrorText, Input, Select } from "../components/ui";
+import { Avatar, Badge, Button, Card, CardHeader, ErrorText, Input, Page, PageHeader, Select } from "../components/ui";
+import { AlertIcon, FolderIcon, UsersIcon } from "../components/icons";
 import InlineEdit from "../components/InlineEdit";
 import { useProjectCtx } from "./projectContext";
 import { useQueryClient } from "@tanstack/react-query";
@@ -32,41 +33,39 @@ export default function SettingsPage() {
   const [msg, setMsg] = useState<string | null>(null);
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6 p-6">
-      <h1 className="text-2xl font-semibold">Team &amp; settings</h1>
+    <Page width="narrow">
+      <PageHeader title="Team & settings" description="Manage who can see and edit this project." />
 
-      <Card className="space-y-3 p-5">
-        <h2 className="font-semibold">Project</h2>
-        <div>
-          <div className="text-xs text-slate-500">Name</div>
-          <InlineEdit value={project.name} disabled={!isOwner} onSave={(name) => name.trim() && updateProject.mutate({ name })} />
-        </div>
-        <div>
-          <div className="text-xs text-slate-500">Description</div>
-          <InlineEdit value={project.description} disabled={!isOwner} multiline onSave={(description) => updateProject.mutate({ description })} />
+      <Card className="overflow-hidden">
+        <CardHeader icon={FolderIcon} title="Project" />
+        <div className="space-y-4 p-5">
+          <div>
+            <div className="mb-1 text-[13px] font-medium text-slate-700">Name</div>
+            <InlineEdit value={project.name} disabled={!isOwner} onSave={(name) => name.trim() && updateProject.mutate({ name })} />
+          </div>
+          <div>
+            <div className="mb-1 text-[13px] font-medium text-slate-700">Description</div>
+            <InlineEdit value={project.description} disabled={!isOwner} multiline placeholder="Add a description…" onSave={(description) => updateProject.mutate({ description })} />
+          </div>
         </div>
       </Card>
 
       <Card className="overflow-hidden">
-        <div className="border-b border-slate-200 px-5 py-3 font-semibold">Members</div>
+        <CardHeader icon={UsersIcon} title="Members" description={`${members.data?.length ?? 0} members${invites.data?.length ? ` · ${invites.data.length} pending` : ""}`} />
         <ul className="divide-y divide-slate-100">
           {members.data?.map((mem) => (
-            <li key={mem.user_id} className="flex items-center gap-3 px-5 py-2.5">
-              {mem.profiles?.avatar_url ? (
-                <img src={mem.profiles.avatar_url} className="h-8 w-8 rounded-full" alt="" referrerPolicy="no-referrer" />
-              ) : (
-                <div className="h-8 w-8 rounded-full bg-slate-200" />
-              )}
+            <li key={mem.user_id} className="flex items-center gap-3 px-5 py-3">
+              <Avatar src={mem.profiles?.avatar_url} name={mem.profiles?.full_name ?? mem.profiles?.email} size={34} />
               <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-medium">
+                <div className="flex items-center gap-2 truncate text-sm font-medium text-slate-900">
                   {mem.profiles?.full_name ?? mem.profiles?.email}
-                  {mem.user_id === user?.id && <span className="ml-1 text-slate-400">(you)</span>}
+                  {mem.user_id === user?.id && <Badge>You</Badge>}
                 </div>
                 <div className="truncate text-xs text-slate-500">{mem.profiles?.email}</div>
               </div>
               {isOwner ? (
                 <>
-                  <Select value={mem.role} onChange={(e) => m.setRole.mutate({ userId: mem.user_id, role: e.target.value as Role })} className="py-1 text-xs">
+                  <Select compact value={mem.role} onChange={(e) => m.setRole.mutate({ userId: mem.user_id, role: e.target.value as Role })} className="capitalize">
                     {ROLES.map((r) => (
                       <option key={r.value} value={r.value}>
                         {r.value}
@@ -78,15 +77,19 @@ export default function SettingsPage() {
                   </Button>
                 </>
               ) : (
-                <span className="text-xs text-slate-500">{mem.role}</span>
+                <Badge tone={mem.role === "owner" ? "accent" : "neutral"} className="capitalize">
+                  {mem.role}
+                </Badge>
               )}
             </li>
           ))}
           {invites.data?.map((inv) => (
-            <li key={inv.email} className="flex items-center gap-3 px-5 py-2.5 text-sm">
-              <div className="h-8 w-8 rounded-full border border-dashed border-slate-300" />
-              <div className="flex-1">
-                <div>{inv.email}</div>
+            <li key={inv.email} className="flex items-center gap-3 px-5 py-3 text-sm">
+              <div className="h-[34px] w-[34px] shrink-0 rounded-full border border-dashed border-slate-300 bg-slate-50" />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 truncate font-medium text-slate-800">
+                  {inv.email} <Badge tone="amber">Pending</Badge>
+                </div>
                 <div className="text-xs text-slate-500">Invited as {inv.role} — joins automatically on first sign-in</div>
               </div>
               {isOwner && (
@@ -99,7 +102,7 @@ export default function SettingsPage() {
         </ul>
         {isOwner && (
           <form
-            className="flex flex-wrap gap-2 border-t border-slate-200 bg-slate-50 px-5 py-3"
+            className="flex flex-wrap gap-2 border-t border-slate-100 bg-slate-50/70 px-5 py-4"
             onSubmit={async (e) => {
               e.preventDefault();
               setMsg(null);
@@ -121,16 +124,24 @@ export default function SettingsPage() {
             </Button>
           </form>
         )}
-        <div className="space-y-2 px-5 pb-3">
-          {msg && <div className="text-sm text-emerald-700">{msg}</div>}
-          <ErrorText error={m.add.error ?? m.setRole.error ?? m.remove.error} />
-        </div>
+        {(msg || m.add.error || m.setRole.error || m.remove.error) && (
+          <div className="space-y-2 px-5 pb-4">
+            {msg && <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{msg}</div>}
+            <ErrorText error={m.add.error ?? m.setRole.error ?? m.remove.error} />
+          </div>
+        )}
       </Card>
 
       {isOwner && (
-        <Card className="border-red-200 p-5">
-          <h2 className="font-semibold text-red-700">Danger zone</h2>
-          <p className="mt-1 mb-3 text-sm text-slate-600">Deleting the project removes all subsystems, parts, variables and {files.length} files permanently.</p>
+        <Card className="overflow-hidden border-red-200">
+          <div className="flex flex-wrap items-center gap-4 p-5">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-red-50 text-red-600">
+            <AlertIcon size={18} />
+          </span>
+          <div className="min-w-0 flex-1">
+            <h2 className="text-[15px] font-semibold text-red-700">Delete this project</h2>
+            <p className="mt-0.5 text-sm text-slate-600">Removes all subsystems, parts, variables and {files.length} files permanently.</p>
+          </div>
           <Button
             variant="danger"
             onClick={async () => {
@@ -143,8 +154,9 @@ export default function SettingsPage() {
           >
             Delete project
           </Button>
+          </div>
         </Card>
       )}
-    </div>
+    </Page>
   );
 }

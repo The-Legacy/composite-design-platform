@@ -6,7 +6,8 @@ import { useFiles } from "../data/queries";
 import { useComposites } from "../data/composites";
 import { math } from "../equations/engine";
 import { formatLayup } from "../equations/laminate";
-import { Button, Card, EmptyState, Select } from "../components/ui";
+import { Button, Card, CardHeader, EmptyState, Page, PageHeader, Select, Stat, StatusBadge, Warning } from "../components/ui";
+import { BoxIcon, DownloadIcon, ScaleIcon } from "../components/icons";
 import { useProjectCtx } from "./projectContext";
 
 const MASS_UNITS = ["kg", "g", "lb", "oz"] as const;
@@ -126,56 +127,62 @@ export default function RollupPage() {
   };
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 p-6">
-      <div className="flex flex-wrap items-end gap-4">
-        <div className="flex-1">
-          <h1 className="text-2xl font-semibold">Mass &amp; BOM</h1>
-          <p className="mt-1 text-sm text-slate-600">
-            Sums each part's <code className="font-mono">mass</code> and <code className="font-mono">cost</code> variables, times{" "}
-            <code className="font-mono">qty</code> (default 1). Add those names to a part's equation sheet, e.g.{" "}
-            <code className="font-mono">mass = layup_areal_mass * 0.12 m^2</code>.
-          </p>
-        </div>
-        <Select value={unit} onChange={(e) => setUnit(e.target.value as MassUnit)} className="py-1.5">
-          {MASS_UNITS.map((u) => (
-            <option key={u}>{u}</option>
-          ))}
-        </Select>
-        <Button onClick={exportCsv} disabled={!rows.length}>
-          Export CSV
-        </Button>
-      </div>
+    <Page width="wide">
+      <PageHeader
+        title="Mass & BOM"
+        description={
+          <>
+            Sums each part's <code className="code-chip">mass</code> and <code className="code-chip">cost</code> variables, times{" "}
+            <code className="code-chip">qty</code> (default 1). Add those names to a part's equation sheet, e.g.{" "}
+            <code className="code-chip">mass = layup_areal_mass * 0.12 m^2</code>.
+          </>
+        }
+        actions={
+          <>
+            <Select value={unit} onChange={(e) => setUnit(e.target.value as MassUnit)} title="Mass unit">
+              {MASS_UNITS.map((u) => (
+                <option key={u}>{u}</option>
+              ))}
+            </Select>
+            <Button onClick={exportCsv} disabled={!rows.length}>
+              <DownloadIcon /> Export CSV
+            </Button>
+          </>
+        }
+      />
 
       {rows.length ? (
         <>
-          <div className="grid gap-4 sm:grid-cols-3">
-            <Card className="p-4">
-              <div className="text-xs text-slate-500">Total mass</div>
-              <div className="mt-1 font-mono text-2xl font-semibold">
-                {fmt(total(rows, "mass"))} {unit}
-              </div>
-              {missingMass > 0 && <div className="mt-1 text-xs text-amber-700">{missingMass} parts have no mass yet</div>}
-            </Card>
-            <Card className="p-4">
-              <div className="text-xs text-slate-500">Total cost</div>
-              <div className="mt-1 font-mono text-2xl font-semibold">{fmt(total(rows, "cost"), 2)}</div>
-            </Card>
-            <Card className="p-4">
-              <div className="text-xs text-slate-500">By subsystem</div>
-              <div className="mt-2 space-y-1">
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-4">
+              <Stat
+                icon={ScaleIcon}
+                label="Total mass"
+                value={
+                  <>
+                    {fmt(total(rows, "mass"))} <span className="text-base font-medium text-slate-400">{unit}</span>
+                  </>
+                }
+                hint={missingMass > 0 && <Warning>{missingMass} part{missingMass === 1 ? " has" : "s have"} no mass yet</Warning>}
+              />
+              <Stat icon={BoxIcon} label="Total cost" value={fmt(total(rows, "cost"), 2)} />
+            </div>
+            <Card className="p-4 md:col-span-2">
+              <div className="text-xs font-medium text-slate-500">Mass by subsystem</div>
+              <div className="mt-3 space-y-3">
                 {[...bySub].map(([s, list]) => {
                   const t = total(list, "mass");
                   const all = total(rows, "mass") || 1;
                   return (
-                    <div key={s} className="text-xs">
-                      <div className="flex justify-between">
-                        <span>{s}</span>
-                        <span className="font-mono">
-                          {fmt(t)} {unit}
+                    <div key={s} className="text-[13px]">
+                      <div className="mb-1 flex justify-between gap-3">
+                        <span className="font-medium text-slate-700">{s}</span>
+                        <span className="font-mono text-slate-600 tabular-nums">
+                          {fmt(t)} {unit} <span className="ml-1 text-slate-400">{Math.round((t / all) * 100)}%</span>
                         </span>
                       </div>
-                      <div className="h-1.5 rounded bg-slate-100">
-                        <div className="h-full rounded bg-accent" style={{ width: `${(t / all) * 100}%` }} />
+                      <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+                        <div className="h-full rounded-full bg-gradient-to-r from-accent to-[oklch(0.6_0.17_275)] transition-all" style={{ width: `${(t / all) * 100}%` }} />
                       </div>
                     </div>
                   );
@@ -184,51 +191,55 @@ export default function RollupPage() {
             </Card>
           </div>
 
-          <Card className="overflow-x-auto">
+          <Card className="overflow-hidden">
+            <CardHeader title="Bill of materials" description={`${rows.length} parts across ${bySub.size} subsystems`} />
+            <div className="overflow-x-auto">
             <table className="w-full min-w-[900px] text-sm">
               <thead>
-                <tr className="border-b border-slate-200 text-left text-xs text-slate-500">
-                  <th className="px-3 py-2 font-medium">Part</th>
-                  <th className="px-3 py-2 font-medium">P/N</th>
-                  <th className="px-3 py-2 font-medium">Status</th>
-                  <th className="px-3 py-2 text-right font-medium">Qty</th>
-                  <th className="px-3 py-2 text-right font-medium">Mass each</th>
-                  <th className="px-3 py-2 text-right font-medium">Mass total</th>
-                  <th className="px-3 py-2 text-right font-medium">Cost total</th>
-                  <th className="px-3 py-2 font-medium">Layup</th>
+                <tr className="border-b border-slate-100 text-left text-[11px] font-semibold tracking-wide text-slate-500 uppercase">
+                  <th className="px-4 py-2.5 font-semibold">Part</th>
+                  <th className="px-3 py-2.5 font-semibold">P/N</th>
+                  <th className="px-3 py-2.5 font-semibold">Status</th>
+                  <th className="px-3 py-2.5 text-right font-semibold">Qty</th>
+                  <th className="px-3 py-2.5 text-right font-semibold">Mass each</th>
+                  <th className="px-3 py-2.5 text-right font-semibold">Mass total</th>
+                  <th className="px-3 py-2.5 text-right font-semibold">Cost total</th>
+                  <th className="px-3 py-2.5 font-semibold">Layup</th>
                 </tr>
               </thead>
               {[...bySub].map(([s, list]) => (
                 <tbody key={s}>
-                  <tr className="bg-slate-50 text-xs font-semibold text-slate-600">
-                    <td className="px-3 py-1.5" colSpan={5}>
+                  <tr className="border-y border-slate-200/70 bg-slate-50/80 text-xs font-semibold text-slate-700">
+                    <td className="px-4 py-2" colSpan={5}>
                       {s}
                     </td>
-                    <td className="px-3 py-1.5 text-right font-mono">
+                    <td className="px-3 py-2 text-right font-mono tabular-nums">
                       {fmt(total(list, "mass"))} {unit}
                     </td>
-                    <td className="px-3 py-1.5 text-right font-mono">{fmt(total(list, "cost"), 2)}</td>
+                    <td className="px-3 py-2 text-right font-mono tabular-nums">{fmt(total(list, "cost"), 2)}</td>
                     <td />
                   </tr>
                   {list.map((r) => (
-                    <tr key={r.partId} className="border-b border-slate-100 align-top hover:bg-slate-50/60">
-                      <td className="px-3 py-1.5">
-                        <Link to={`/p/${project.id}/part/${r.partId}`} className="font-medium hover:text-accent">
+                    <tr key={r.partId} className="border-b border-slate-100 align-top transition-colors last:border-b-0 hover:bg-slate-50/60">
+                      <td className="px-4 py-2">
+                        <Link to={`/p/${project.id}/part/${r.partId}`} className="font-medium text-slate-900 hover:text-accent">
                           {r.name}
                         </Link>
                         {r.problems.map((p) => (
-                          <div key={p} className="text-xs text-amber-700">
-                            ⚠ {p}
+                          <div key={p} className="mt-0.5">
+                            <Warning>{p}</Warning>
                           </div>
                         ))}
                       </td>
-                      <td className="px-3 py-1.5 font-mono text-xs">{r.partNumber}</td>
-                      <td className="px-3 py-1.5 text-xs">{r.status}</td>
-                      <td className="px-3 py-1.5 text-right font-mono">{r.qty}</td>
-                      <td className="px-3 py-1.5 text-right font-mono">{fmt(r.mass)}</td>
-                      <td className="px-3 py-1.5 text-right font-mono">{r.mass === null ? "—" : fmt(r.mass * r.qty)}</td>
-                      <td className="px-3 py-1.5 text-right font-mono">{r.cost === null ? "—" : fmt(r.cost * r.qty, 2)}</td>
-                      <td className="max-w-[260px] truncate px-3 py-1.5 font-mono text-xs text-slate-500" title={r.layup}>
+                      <td className="px-3 py-2 font-mono text-xs text-slate-600">{r.partNumber}</td>
+                      <td className="px-3 py-2">
+                        <StatusBadge status={r.status} />
+                      </td>
+                      <td className="px-3 py-2 text-right font-mono tabular-nums">{r.qty}</td>
+                      <td className="px-3 py-2 text-right font-mono tabular-nums">{fmt(r.mass)}</td>
+                      <td className="px-3 py-2 text-right font-mono font-medium tabular-nums">{r.mass === null ? "—" : fmt(r.mass * r.qty)}</td>
+                      <td className="px-3 py-2 text-right font-mono tabular-nums">{r.cost === null ? "—" : fmt(r.cost * r.qty, 2)}</td>
+                      <td className="max-w-[260px] truncate px-3 py-2 font-mono text-xs text-slate-500" title={r.layup}>
                         {r.layup}
                       </td>
                     </tr>
@@ -236,11 +247,14 @@ export default function RollupPage() {
                 </tbody>
               ))}
             </table>
+            </div>
           </Card>
         </>
       ) : (
-        <EmptyState title="No parts yet" />
+        <EmptyState icon={ScaleIcon} title="No parts yet">
+          Add parts with <code className="code-chip">mass</code> variables to see the rollup.
+        </EmptyState>
       )}
-    </div>
+    </Page>
   );
 }

@@ -5,7 +5,8 @@ import { useParts, useTableMutations, useVariables } from "../data/queries";
 import { useComposites } from "../data/composites";
 import VariableHistory from "./VariableHistory";
 import type { Part, Variable } from "../lib/types";
-import { Button, Card, ErrorText, cx } from "./ui";
+import { Button, Card, CardHeader, Disclosure, ErrorText, IconButton, Warning, cx } from "./ui";
+import { FunctionIcon, HistoryIcon, PlusIcon, SigmaIcon, TrashIcon } from "./icons";
 
 type Draft = Partial<Pick<Variable, "name" | "expression" | "display_unit" | "description">>;
 
@@ -90,31 +91,47 @@ export default function EquationSheet({
 
   return (
     <Card className="overflow-hidden">
-      <div className="flex flex-wrap items-baseline gap-2 border-b border-slate-200 px-4 py-3">
-        <h2 className="font-semibold">{partId ? "Equations & variables" : "Project variables"}</h2>
-        <span className="text-xs text-slate-500">
-          {partId ? (
+      <CardHeader
+        icon={partId ? FunctionIcon : SigmaIcon}
+        title={partId ? "Equations & variables" : "Project variables"}
+        description={
+          partId ? (
             <>
-              Other parts use these as <code className="font-mono text-slate-700">{thisPart?.slug}.name</code>. Project variables are
-              available by bare name.
+              Other parts use these as <code className="code-chip">{thisPart?.slug}.name</code>. Project variables are available by bare name.
             </>
           ) : (
             "Shared constants (materials, loads, safety factors…) every part can use by bare name."
-          )}
-        </span>
-      </div>
-      <ErrorText error={update.error ?? create.error ?? remove.error ?? vars.error} />
+          )
+        }
+        actions={
+          rows.length > 0 && (
+            <div className="hidden items-center gap-3 text-[11px] text-slate-500 md:flex">
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-sm bg-accent-muted ring-1 ring-accent/30" /> uses
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-sm bg-amber-100 ring-1 ring-amber-300" /> used by
+              </span>
+            </div>
+          )
+        }
+      />
+      {(update.error ?? create.error ?? remove.error ?? vars.error) && (
+        <div className="px-4 pt-3">
+          <ErrorText error={update.error ?? create.error ?? remove.error ?? vars.error} />
+        </div>
+      )}
 
       <div className="overflow-x-auto">
         <table className="w-full min-w-[760px] text-sm">
           <thead>
-            <tr className="border-b border-slate-100 text-left text-xs text-slate-500">
-              <th className="w-40 px-3 py-2 font-medium">Name</th>
-              <th className="px-3 py-2 font-medium">Value / formula</th>
-              <th className="w-44 px-3 py-2 font-medium">Result</th>
-              <th className="w-24 px-3 py-2 font-medium">Show in</th>
-              <th className="w-56 px-3 py-2 font-medium">Notes</th>
-              <th className="w-16" />
+            <tr className="border-b border-slate-100 bg-slate-50/70 text-left text-[11px] font-semibold tracking-wide text-slate-500 uppercase">
+              <th className="w-44 py-2 pr-2 pl-5 font-semibold">Name</th>
+              <th className="px-2 py-2 font-semibold">Value / formula</th>
+              <th className="w-48 px-2 py-2 font-semibold">Result</th>
+              <th className="w-24 px-2 py-2 font-semibold">Show in</th>
+              <th className="w-56 px-2 py-2 font-semibold">Notes</th>
+              <th className="w-20" />
             </tr>
           </thead>
           <tbody>
@@ -145,63 +162,65 @@ export default function EquationSheet({
                   onMouseEnter={() => setHovered(v.id)}
                   onMouseLeave={() => setHovered(null)}
                   className={cx(
-                    "border-b border-slate-100 align-top",
-                    isDep && "bg-blue-50",
-                    isDependent && "bg-amber-50",
-                    hovered === v.id && "bg-slate-50",
+                    "group relative border-b border-slate-100 align-top transition-colors",
+                    isDep ? "bg-accent-soft" : isDependent ? "bg-amber-50/80" : hovered === v.id ? "bg-slate-50/80" : "",
                   )}
                 >
-                  <td className="px-3 py-1.5">
-                    <CellInput {...inputProps("name")} className="font-mono font-medium" />
+                  <td className="relative py-1.5 pr-2 pl-5">
+                    <span
+                      className={cx(
+                        "absolute inset-y-0 left-0 w-[3px]",
+                        isDep ? "bg-accent" : isDependent ? "bg-amber-400" : hovered === v.id ? "bg-slate-300" : "bg-transparent",
+                      )}
+                    />
+                    <CellInput {...inputProps("name")} className="font-mono font-medium text-slate-900" />
                   </td>
-                  <td className="px-3 py-1.5">
-                    <CellInput {...inputProps("expression")} className="font-mono" placeholder="e.g. 0.25 mm or E1 * t_ply" />
-                    {tex && <Tex tex={tex} className="mt-1 block px-2 text-slate-600" />}
+                  <td className="px-2 py-1.5">
+                    <CellInput {...inputProps("expression")} className="font-mono text-slate-700" placeholder="e.g. 0.25 mm or E1 * t_ply" />
+                    {tex && <Tex tex={tex} className="mt-1 block px-2 text-slate-500" />}
                     <RefLine r={r} refLabel={refLabel} />
                   </td>
-                  <td className="px-3 py-1.5">
+                  <td className="px-2 py-1.5">
                     <div
                       className={cx(
-                        "px-2 py-1.5 font-mono",
-                        r?.error ? "text-red-600" : "font-semibold text-slate-900",
+                        "mt-0.5 inline-flex max-w-full rounded-md px-2 py-1 font-mono text-[13px] tabular-nums",
+                        r?.error ? "bg-red-50 text-red-700 ring-1 ring-red-200/70 ring-inset" : "bg-slate-100/80 font-semibold text-slate-900",
                       )}
                       title={r?.error}
                     >
-                      {r?.text}
+                      <span className="truncate">{r?.text}</span>
                     </div>
-                    {r?.error && <div className="px-2 text-xs text-red-600">{r.error}</div>}
+                    {r?.error && <div className="mt-1 px-0.5 text-xs text-red-600">{r.error}</div>}
                     {r?.warnings.map((w) => (
-                      <div key={w} className="px-2 text-xs text-amber-700">
-                        ⚠ {w}
+                      <div key={w} className="mt-1 px-0.5">
+                        <Warning>{w}</Warning>
                       </div>
                     ))}
                   </td>
-                  <td className="px-3 py-1.5">
+                  <td className="px-2 py-1.5">
                     <CellInput {...inputProps("display_unit")} className="font-mono" placeholder="unit" />
                   </td>
-                  <td className="px-3 py-1.5">
-                    <CellInput {...inputProps("description")} placeholder="—" />
+                  <td className="px-2 py-1.5">
+                    <CellInput {...inputProps("description")} className="text-slate-600" placeholder="—" />
                   </td>
-                  <td className="py-1.5 pr-2 whitespace-nowrap">
-                    <button
-                      className="rounded p-1 text-slate-300 hover:bg-slate-100 hover:text-slate-700"
-                      title="Change history"
-                      onClick={() => setHistoryFor(v)}
-                    >
-                      ⟲
-                    </button>
-                    {canEdit && (
-                      <button
-                        className="rounded p-1 text-slate-300 hover:bg-red-50 hover:text-red-600"
-                        title="Delete variable"
-                        onClick={() => {
-                          const users = r?.dependents.length ?? 0;
-                          if (confirm(users ? `${users} other variable(s) use ${v.name}. Delete anyway?` : `Delete ${v.name}?`)) remove.mutate(v.id);
-                        }}
-                      >
-                        ✕
-                      </button>
-                    )}
+                  <td className="py-2 pr-3 text-right whitespace-nowrap">
+                    <span className="inline-flex gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+                      <IconButton title="Change history" onClick={() => setHistoryFor(v)}>
+                        <HistoryIcon size={15} />
+                      </IconButton>
+                      {canEdit && (
+                        <IconButton
+                          tone="danger"
+                          title="Delete variable"
+                          onClick={() => {
+                            const users = r?.dependents.length ?? 0;
+                            if (confirm(users ? `${users} other variable(s) use ${v.name}. Delete anyway?` : `Delete ${v.name}?`)) remove.mutate(v.id);
+                          }}
+                        >
+                          <TrashIcon size={15} />
+                        </IconButton>
+                      )}
+                    </span>
                   </td>
                 </tr>
               );
@@ -215,7 +234,7 @@ export default function EquationSheet({
           </tbody>
         </table>
       </div>
-      {!rows.length && !canEdit && <div className="p-6 text-center text-sm text-slate-500">No variables yet.</div>}
+      {!rows.length && !canEdit && <div className="p-8 text-center text-sm text-slate-500">No variables yet.</div>}
       <Help partSlug={thisPart?.slug} otherParts={(parts.data ?? []).filter((p) => p.id !== partId)} />
       <VariableHistory
         projectId={projectId}
@@ -231,9 +250,17 @@ export default function EquationSheet({
 function RefLine({ r, refLabel }: { r?: VarResult; refLabel: (id: string) => string }) {
   if (!r || (!r.deps.length && !r.dependents.length)) return null;
   return (
-    <div className="mt-0.5 flex flex-wrap gap-x-3 px-2 text-[11px] text-slate-400">
-      {r.deps.length > 0 && <span>uses {r.deps.map(refLabel).join(", ")}</span>}
-      {r.dependents.length > 0 && <span>used by {r.dependents.map(refLabel).join(", ")}</span>}
+    <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 px-2 text-[11px] text-slate-400">
+      {r.deps.length > 0 && (
+        <span>
+          <span className="text-slate-500">uses</span> <span className="font-mono">{r.deps.map(refLabel).join(", ")}</span>
+        </span>
+      )}
+      {r.dependents.length > 0 && (
+        <span>
+          <span className="text-slate-500">used by</span> <span className="font-mono">{r.dependents.map(refLabel).join(", ")}</span>
+        </span>
+      )}
     </div>
   );
 }
@@ -243,7 +270,7 @@ function CellInput({ className, ...props }: React.InputHTMLAttributes<HTMLInputE
     <input
       {...props}
       className={cx(
-        "w-full rounded-md border border-transparent bg-transparent px-2 py-1.5 outline-none hover:border-slate-200 focus:border-accent focus:bg-white focus:ring-2 focus:ring-accent/20 disabled:hover:border-transparent",
+        "h-8 w-full rounded-md border border-transparent bg-transparent px-2 text-[13px] outline-none transition placeholder:text-slate-300 hover:border-slate-200 hover:bg-white focus:border-accent focus:bg-white focus:ring-3 focus:ring-accent/15 disabled:hover:border-transparent disabled:hover:bg-transparent",
         className,
       )}
     />
@@ -274,23 +301,25 @@ function NewRow({ existing, onAdd }: { existing: string[]; onAdd: (row: Partial<
   const onKey = (e: KeyboardEvent) => e.key === "Enter" && submit();
 
   return (
-    <tr className="bg-slate-50/60">
-      <td className="px-3 py-2">
-        <CellInput id="new-var-name" value={name} onChange={(e) => setName(e.target.value)} onKeyDown={onKey} placeholder="new_name" className="border-slate-200 bg-white font-mono" />
+    <tr className="bg-slate-50/50">
+      <td className="py-2.5 pr-2 pl-5">
+        <CellInput id="new-var-name" value={name} onChange={(e) => setName(e.target.value)} onKeyDown={onKey} placeholder="new_name" className="border-slate-200 bg-white font-mono shadow-card" />
       </td>
-      <td className="px-3 py-2">
-        <CellInput value={expression} onChange={(e) => setExpression(e.target.value)} onKeyDown={onKey} placeholder="value or formula" className="border-slate-200 bg-white font-mono" />
+      <td className="px-2 py-2.5">
+        <CellInput value={expression} onChange={(e) => setExpression(e.target.value)} onKeyDown={onKey} placeholder="value or formula" className="border-slate-200 bg-white font-mono shadow-card" />
         {err && <div className="px-2 pt-1 text-xs text-red-600">{err}</div>}
       </td>
-      <td className="px-3 py-2">
-        <Button size="sm" variant="primary" onClick={submit}>
-          Add
+      <td className="px-2 py-2.5">
+        <Button size="sm" variant="primary" className="h-8" onClick={submit}>
+          <PlusIcon size={14} /> Add variable
         </Button>
       </td>
-      <td className="px-3 py-2">
-        <CellInput value={unit} onChange={(e) => setUnit(e.target.value)} onKeyDown={onKey} placeholder="unit" className="border-slate-200 bg-white font-mono" />
+      <td className="px-2 py-2.5">
+        <CellInput value={unit} onChange={(e) => setUnit(e.target.value)} onKeyDown={onKey} placeholder="unit" className="border-slate-200 bg-white font-mono shadow-card" />
       </td>
-      <td colSpan={2} />
+      <td colSpan={2} className="px-2 py-2.5 align-middle text-[11px] text-slate-400">
+        Press Enter to add
+      </td>
     </tr>
   );
 }
@@ -298,12 +327,12 @@ function NewRow({ existing, onAdd }: { existing: string[]; onAdd: (row: Partial<
 function Help({ partSlug, otherParts }: { partSlug?: string; otherParts: Part[] }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className="border-t border-slate-100 px-4 py-2 text-xs text-slate-500">
-      <button onClick={() => setOpen(!open)} className="hover:text-slate-700">
-        {open ? "▾" : "▸"} Formula help
-      </button>
+    <div className="border-t border-slate-100 px-5 py-2.5 text-xs text-slate-500">
+      <Disclosure open={open} onToggle={() => setOpen(!open)}>
+        Formula help
+      </Disclosure>
       {open && (
-        <div className="mt-2 grid gap-4 pb-2 sm:grid-cols-2">
+        <div className="mt-3 grid gap-x-8 gap-y-4 pb-2 leading-relaxed sm:grid-cols-2 [&_code]:rounded [&_code]:bg-slate-100 [&_code]:px-1 [&_code]:py-px [&_code]:text-slate-700">
           <ul className="space-y-1">
             <li>
               Values with units: <code className="font-mono">135 GPa</code>, <code className="font-mono">0.25 mm</code>,{" "}

@@ -3,7 +3,8 @@ import { useMaterials, useTableMutations } from "../data/queries";
 import { useComposites } from "../data/composites";
 import { MATERIAL_FIELDS, type MaterialForm, type MaterialProps } from "../equations/laminate";
 import type { Material } from "../lib/types";
-import { Button, Card, EmptyState, ErrorText, Field, Input, Modal, Select, cx } from "../components/ui";
+import { Badge, Button, Card, EmptyState, ErrorText, Field, IconButton, Input, Modal, Page, PageHeader, Select, cx } from "../components/ui";
+import { InfoIcon, LayersIcon, PlusIcon, TrashIcon } from "../components/icons";
 import { useProjectCtx } from "./projectContext";
 
 const FORMS: { value: MaterialForm; label: string }[] = [
@@ -49,21 +50,23 @@ export default function MaterialsPage() {
   };
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 p-6">
-      <div className="flex flex-wrap items-end gap-4">
-        <div className="flex-1">
-          <h1 className="text-2xl font-semibold">Materials</h1>
-          <p className="mt-1 text-sm text-slate-600">
+    <Page width="wide">
+      <PageHeader
+        title="Materials"
+        description={
+          <>
             Ply and core properties used by part layups. Equations can also use them directly, e.g.{" "}
-            <code className="font-mono">{list[0]?.slug ?? "CF_UD"}.E1</code> or <code className="font-mono">{list[0]?.slug ?? "CF_UD"}.t_ply</code>.
-          </p>
-        </div>
-        {canEdit && (
-          <Button variant="primary" onClick={() => setAdding(true)}>
-            + Add material
-          </Button>
-        )}
-      </div>
+            <code className="code-chip">{list[0]?.slug ?? "CF_UD"}.E1</code> or <code className="code-chip">{list[0]?.slug ?? "CF_UD"}.t_ply</code>.
+          </>
+        }
+        actions={
+          canEdit && (
+            <Button variant="primary" onClick={() => setAdding(true)}>
+              <PlusIcon /> Add material
+            </Button>
+          )
+        }
+      />
       <ErrorText error={materials.error ?? update.error ?? create.error} />
       {removeError && <ErrorText error={new Error(removeError)} />}
 
@@ -71,35 +74,35 @@ export default function MaterialsPage() {
         <Card className="overflow-x-auto">
           <table className="w-full min-w-[1100px] text-sm">
             <thead>
-              <tr className="border-b border-slate-200 text-left text-xs text-slate-500">
-                <th className="px-3 py-2 font-medium">Name</th>
-                <th className="px-3 py-2 font-medium">ID</th>
-                <th className="px-3 py-2 font-medium">Form</th>
+              <tr className="border-b border-slate-200/80 bg-slate-50/70 text-left text-[11px] font-semibold tracking-wide text-slate-500">
+                <th className="px-4 py-2.5 font-semibold uppercase">Name</th>
+                <th className="px-3 py-2.5 font-semibold uppercase">ID</th>
+                <th className="px-3 py-2.5 font-semibold uppercase">Form</th>
                 {MATERIAL_FIELDS.map((f) => (
-                  <th key={f.key} className="px-1.5 py-2 text-right font-medium" title={`${f.ref}${f.unit ? ` (${f.unit})` : ""}`}>
+                  <th key={f.key} className="px-1.5 py-2.5 text-right font-semibold" title={`${f.ref}${f.unit ? ` (${f.unit})` : ""}`}>
                     {f.label}
-                    {f.unit && <div className="font-normal text-slate-400">{f.unit}</div>}
+                    {f.unit && <div className="font-normal tracking-normal text-slate-400">{f.unit}</div>}
                   </th>
                 ))}
-                <th className="px-3 py-2 font-medium">Notes</th>
+                <th className="px-3 py-2.5 font-semibold uppercase">Notes</th>
                 <th />
               </tr>
             </thead>
             <tbody>
               {list.map((m) => (
-                <tr key={m.id} className="border-b border-slate-100 align-top hover:bg-slate-50/60">
-                  <td className="px-2 py-1">
+                <tr key={m.id} className="group border-b border-slate-100 align-top transition-colors hover:bg-slate-50/60">
+                  <td className="py-1 pr-2 pl-3">
                     <Cell defaultValue={m.name} disabled={!canEdit} onCommit={(v) => v.trim() && v !== m.name && update.mutate({ id: m.id, name: v.trim() })} className="w-48 font-medium" />
                   </td>
-                  <td className="px-3 py-2.5 font-mono text-xs text-slate-700" title="Rename by recreating — formulas reference this ID">
-                    {m.slug}
+                  <td className="px-3 py-2" title="Rename by recreating — formulas reference this ID">
+                    <code className="code-chip text-xs">{m.slug}</code>
                   </td>
                   <td className="px-2 py-1">
                     <select
                       value={m.form}
                       disabled={!canEdit}
                       onChange={(e) => update.mutate({ id: m.id, form: e.target.value as MaterialForm })}
-                      className="rounded border border-transparent bg-transparent py-1 text-xs hover:border-slate-200"
+                      className="ui-select h-8 rounded-md border border-transparent bg-transparent pl-1.5 text-xs text-slate-600 hover:border-slate-200 hover:bg-white"
                     >
                       {FORMS.map((f) => (
                         <option key={f.value} value={f.value}>
@@ -122,11 +125,17 @@ export default function MaterialsPage() {
                   <td className="px-2 py-1">
                     <Cell defaultValue={m.notes} disabled={!canEdit} onCommit={(v) => v !== m.notes && update.mutate({ id: m.id, notes: v })} className="w-56" placeholder="—" />
                   </td>
-                  <td className="py-1 pr-2 text-right text-xs whitespace-nowrap text-slate-400">
-                    {usedBy(m.id) > 0 && <span title="Parts whose layup uses this material">{usedBy(m.id)} parts</span>}
+                  <td className="py-1.5 pr-3 text-right text-xs whitespace-nowrap text-slate-400">
+                    <span className="inline-flex items-center gap-1.5">
+                    {usedBy(m.id) > 0 && (
+                      <Badge title="Parts whose layup uses this material">
+                        {usedBy(m.id)} part{usedBy(m.id) === 1 ? "" : "s"}
+                      </Badge>
+                    )}
                     {canEdit && (
-                      <button
-                        className="ml-1 rounded p-1 text-slate-300 hover:bg-red-50 hover:text-red-600"
+                      <IconButton
+                        tone="danger"
+                        className="opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
                         title="Delete material"
                         onClick={async () => {
                           setRemoveError(null);
@@ -135,21 +144,25 @@ export default function MaterialsPage() {
                           remove.mutate(m.id, { onError: (e) => setRemoveError((e as Error).message) });
                         }}
                       >
-                        ✕
-                      </button>
+                        <TrashIcon size={15} />
+                      </IconButton>
                     )}
+                    </span>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-          <div className="border-t border-slate-100 px-4 py-2 text-xs text-slate-500">
+          <div className="flex gap-2 border-t border-slate-100 bg-slate-50/50 px-4 py-2.5 text-xs leading-relaxed text-slate-500">
+            <InfoIcon size={14} className="mt-0.5 shrink-0 text-slate-400" />
+            <span>
             Blank E2/G12 are filled in for isotropic materials (E2 = E1, G12 = E1 / 2(1+ν)). Core and fabric need all four elastic values.
             Strengths are for reference and equations; the layup analysis uses stiffness, thickness, density and cost.
+            </span>
           </div>
         </Card>
       ) : (
-        <EmptyState title="No materials yet">{canEdit ? "Add one from a preset and edit the values to match your datasheet." : "An editor needs to add materials."}</EmptyState>
+        <EmptyState icon={LayersIcon} title="No materials yet">{canEdit ? "Add one from a preset and edit the values to match your datasheet." : "An editor needs to add materials."}</EmptyState>
       )}
 
       <AddMaterialModal
@@ -158,7 +171,7 @@ export default function MaterialsPage() {
         takenSlugs={new Set([...list.map((m) => m.slug), ...parts.map((p) => p.slug)])}
         onCreate={(m) => create.mutateAsync(m as Partial<Material>)}
       />
-    </div>
+    </Page>
   );
 }
 
@@ -177,7 +190,7 @@ function Cell({ defaultValue, onCommit, className, ...props }: { defaultValue: s
         }
       }}
       className={cx(
-        "rounded-md border border-transparent bg-transparent px-1.5 py-1.5 outline-none hover:border-slate-200 focus:border-accent focus:bg-white disabled:hover:border-transparent",
+        "h-8 rounded-md border border-transparent bg-transparent px-1.5 text-[13px] outline-none transition placeholder:text-slate-300 hover:border-slate-200 hover:bg-white focus:border-accent focus:bg-white focus:ring-3 focus:ring-accent/15 disabled:hover:border-transparent disabled:hover:bg-transparent",
         className,
       )}
     />
@@ -244,13 +257,13 @@ function AddMaterialModal({
         </Field>
         <Field
           label="Equation ID"
-          hint={taken ? <span className="text-red-600">Already used by a material or part</span> : <>Formulas use <code className="font-mono">{slug || "ID"}.E1</code></>}
+          hint={taken ? <span className="text-red-600">Already used by a material or part</span> : <>Formulas use <code className="code-chip">{slug || "ID"}.E1</code></>}
         >
           <Input className="font-mono" value={slug} onChange={(e) => setSlug(e.target.value)} />
         </Field>
         <p className="text-xs text-slate-500">Preset values are typical, not design allowables. Edit them in the table to match your datasheet.</p>
         <ErrorText error={err ? new Error(err) : null} />
-        <div className="flex justify-end gap-2">
+        <div className="flex justify-end gap-2 pt-2">
           <Button type="button" onClick={onClose}>
             Cancel
           </Button>

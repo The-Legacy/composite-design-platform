@@ -3,7 +3,17 @@ import { useNavigate } from "react-router";
 import { useFiles, useMaterials, useVariables } from "../data/queries";
 import type { Part, Subsystem } from "../lib/types";
 import { groupRevisions } from "./FilePanel";
-import { cx } from "./ui";
+import { Kbd, cx } from "./ui";
+import { BoxIcon, ComponentIcon, DashboardIcon, FileTextIcon, LayersIcon, SearchIcon, SigmaIcon } from "./icons";
+
+const KIND_ICON: Record<Hit["kind"], typeof BoxIcon> = {
+  Part: BoxIcon,
+  Subsystem: ComponentIcon,
+  File: FileTextIcon,
+  Variable: SigmaIcon,
+  Material: LayersIcon,
+  Page: DashboardIcon,
+};
 
 interface Hit {
   key: string;
@@ -132,8 +142,10 @@ export default function SearchPalette({ projectId, parts, subsystems }: { projec
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/40 p-4 pt-[12vh]" onMouseDown={() => setOpen(false)}>
-      <div className="w-full max-w-xl overflow-hidden rounded-xl bg-white shadow-2xl" onMouseDown={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex animate-fade-in items-start justify-center bg-slate-950/40 p-4 pt-[12vh] backdrop-blur-[2px]" onMouseDown={() => setOpen(false)}>
+      <div className="w-full max-w-xl animate-pop-in overflow-hidden rounded-2xl bg-white shadow-pop" onMouseDown={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-3 border-b border-slate-100 px-4">
+        <SearchIcon size={18} className="shrink-0 text-slate-400" />
         <input
           ref={inputRef}
           value={q}
@@ -154,25 +166,46 @@ export default function SearchPalette({ projectId, parts, subsystems }: { projec
             if (e.key === "Enter") go(results[sel]);
           }}
           placeholder="Search parts, files, variables, materials…"
-          className="w-full border-b border-slate-200 px-4 py-3 text-base outline-none"
+          className="h-14 w-full bg-transparent text-[15px] outline-none placeholder:text-slate-400"
         />
-        <ul className="max-h-[50vh] overflow-auto py-1">
+        <Kbd>Esc</Kbd>
+        </div>
+        {!q && <div className="px-4 pt-3 pb-1 text-[11px] font-semibold tracking-wider text-slate-400 uppercase">Jump to</div>}
+        <ul className="max-h-[50vh] overflow-auto p-2">
           {results.map((h, i) => (
             <li key={h.key}>
               <button
                 onMouseEnter={() => setSel(i)}
                 onClick={() => go(h)}
-                className={cx("flex w-full items-baseline gap-3 px-4 py-2 text-left", i === sel && "bg-accent-soft")}
+                className={cx("flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left", i === sel ? "bg-accent-soft" : "")}
               >
-                <span className="w-16 shrink-0 text-[11px] text-slate-400 uppercase">{h.kind}</span>
-                <span className={cx("min-w-0 truncate text-sm font-medium", h.kind === "Variable" && "font-mono")}>{h.title}</span>
-                <span className="min-w-0 flex-1 truncate text-xs text-slate-500">{h.sub}</span>
+                {(() => {
+                  const Icon = KIND_ICON[h.kind];
+                  return (
+                    <span className={cx("flex h-7 w-7 shrink-0 items-center justify-center rounded-md", i === sel ? "bg-white text-accent shadow-card" : "bg-slate-100 text-slate-500")}>
+                      <Icon size={14} />
+                    </span>
+                  );
+                })()}
+                <span className="min-w-0 flex-1">
+                  <span className={cx("block truncate text-sm font-medium text-slate-900", h.kind === "Variable" && "font-mono text-[13px]")}>{h.title}</span>
+                  {h.sub && <span className="block truncate text-xs text-slate-500">{h.sub}</span>}
+                </span>
+                <span className={cx("shrink-0 text-[11px] font-medium", i === sel ? "text-accent" : "text-slate-400")}>{h.kind}</span>
               </button>
             </li>
           ))}
-          {!results.length && <li className="px-4 py-6 text-center text-sm text-slate-500">No matches</li>}
+          {!results.length && <li className="px-4 py-8 text-center text-sm text-slate-500">No matches for “{q}”</li>}
         </ul>
-        <div className="border-t border-slate-100 px-4 py-1.5 text-[11px] text-slate-400">↑↓ to move · Enter to open · Esc to close</div>
+        <div className="flex items-center gap-4 border-t border-slate-100 bg-slate-50/60 px-4 py-2 text-[11px] text-slate-500">
+          <span className="inline-flex items-center gap-1.5">
+            <Kbd>↑</Kbd>
+            <Kbd>↓</Kbd> move
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <Kbd>Enter</Kbd> open
+          </span>
+        </div>
       </div>
     </div>
   );

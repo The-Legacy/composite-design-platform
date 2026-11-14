@@ -7,10 +7,17 @@ import { driveConfigured, pickDriveFiles } from "../lib/google";
 import { useAuth } from "../auth/AuthProvider";
 import { qk, useTableMutations } from "../data/queries";
 import type { FileRow } from "../lib/types";
-import { Button, Card, EmptyState, cx, formatBytes } from "./ui";
+import { Badge, Button, Card, CardHeader, EmptyState, IconButton, cx, formatBytes } from "./ui";
+import { BoxIcon, CloudIcon, DownloadIcon, FileTextIcon, FileUpIcon, FolderIcon, ImageIcon, PaperclipIcon, RulerIcon, TrashIcon, UploadIcon } from "./icons";
 import FileViewer from "./FileViewer";
 
-const KIND_ICON: Record<FileKind, string> = { model_3d: "🧊", drawing: "📐", image: "🖼️", document: "📄", other: "📎" };
+const KIND_STYLE: Record<FileKind, { icon: typeof BoxIcon; cls: string }> = {
+  model_3d: { icon: BoxIcon, cls: "bg-indigo-50 text-indigo-600 ring-indigo-100" },
+  drawing: { icon: RulerIcon, cls: "bg-sky-50 text-sky-600 ring-sky-100" },
+  image: { icon: ImageIcon, cls: "bg-emerald-50 text-emerald-600 ring-emerald-100" },
+  document: { icon: FileTextIcon, cls: "bg-amber-50 text-amber-600 ring-amber-100" },
+  other: { icon: PaperclipIcon, cls: "bg-slate-100 text-slate-500 ring-slate-200" },
+};
 
 interface Pending {
   key: string;
@@ -148,7 +155,15 @@ export default function FilePanel({
   for (const g of groups) counts.set(g.current.kind, (counts.get(g.current.kind) ?? 0) + 1);
 
   return (
-    <Card className={cx("overflow-hidden", dragging && "ring-2 ring-accent")}>
+    <Card className={cx("relative overflow-hidden transition", dragging && "border-accent ring-4 ring-accent/15")}>
+      {dragging && (
+        <div className="pointer-events-none absolute inset-0 z-10 flex animate-fade-in items-center justify-center bg-accent-soft/80 backdrop-blur-[1px]">
+          <div className="flex flex-col items-center gap-2 text-accent">
+            <UploadIcon size={28} />
+            <span className="text-sm font-medium">Drop to upload</span>
+          </div>
+        </div>
+      )}
       <div
         onDragOver={(e) => {
           if (!canEdit) return;
@@ -162,9 +177,12 @@ export default function FilePanel({
           if (canEdit && e.dataTransfer.files.length) uploadAll(e.dataTransfer.files);
         }}
       >
-        <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 px-4 py-3">
-          <h2 className="mr-auto font-semibold">{title}</h2>
-          {canEdit && (
+        <CardHeader
+          icon={FolderIcon}
+          title={title}
+          description={canEdit ? "Drag & drop files anywhere on this panel" : undefined}
+          actions={
+          canEdit && (
             <>
               <input
                 ref={inputRef}
@@ -191,17 +209,19 @@ export default function FilePanel({
               />
               {driveConfigured && (
                 <Button size="sm" onClick={() => importDrive()}>
-                  Import from Drive
+                  <CloudIcon size={14} /> Import from Drive
                 </Button>
               )}
               <Button size="sm" variant="primary" onClick={() => inputRef.current?.click()}>
-                Upload
+                <UploadIcon size={14} /> Upload
               </Button>
             </>
-          )}
-        </div>
+          )
+          }
+        />
 
-        <div className="flex gap-1 overflow-x-auto border-b border-slate-100 px-3 py-2 text-xs">
+        {groups.length > 0 && (
+        <div className="flex gap-1 overflow-x-auto border-b border-slate-100 px-4 py-2 text-xs">
           {[{ value: "all" as const, label: "All" }, ...FILE_KINDS].map((k) => {
             const c = k.value === "all" ? groups.length : counts.get(k.value) ?? 0;
             if (k.value !== "all" && !c) return null;
@@ -210,32 +230,34 @@ export default function FilePanel({
                 key={k.value}
                 onClick={() => setFilter(k.value)}
                 className={cx(
-                  "rounded-full px-2.5 py-1 whitespace-nowrap",
-                  filter === k.value ? "bg-slate-800 text-white" : "text-slate-600 hover:bg-slate-100",
+                  "inline-flex h-7 items-center gap-1.5 rounded-full px-3 font-medium whitespace-nowrap transition",
+                  filter === k.value ? "bg-slate-900 text-white shadow-card" : "text-slate-600 hover:bg-slate-100",
                 )}
               >
-                {k.label} <span className="opacity-60">{c}</span>
+                {k.label} <span className={cx("tabular-nums", filter === k.value ? "text-white/60" : "text-slate-400")}>{c}</span>
               </button>
             );
           })}
         </div>
+        )}
 
         {(pending.length > 0 || driveError) && (
-          <div className="space-y-1 border-b border-slate-100 px-4 py-2 text-xs">
+          <div className="space-y-2 border-b border-slate-100 bg-slate-50/50 px-4 py-3 text-xs">
             {driveError && <div className="text-red-600">Drive: {driveError}</div>}
             {pending.map((p) => (
-              <div key={p.key} className="flex items-center gap-2">
-                <span className="w-48 truncate">{p.name}</span>
+              <div key={p.key} className="flex items-center gap-3">
+                <UploadIcon size={13} className="shrink-0 text-slate-400" />
+                <span className="w-48 truncate font-medium text-slate-700">{p.name}</span>
                 {p.error ? (
                   <>
                     <span className="flex-1 text-red-600">{p.error}</span>
-                    <button className="text-slate-400" onClick={() => setPending((x) => x.filter((y) => y.key !== p.key))}>
+                    <button className="font-medium text-slate-500 hover:text-slate-800" onClick={() => setPending((x) => x.filter((y) => y.key !== p.key))}>
                       dismiss
                     </button>
                   </>
                 ) : (
-                  <div className="h-1.5 flex-1 overflow-hidden rounded bg-slate-100">
-                    <div className="h-full bg-accent transition-all" style={{ width: `${Math.max(4, p.progress * 100)}%` }} />
+                  <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-200/70">
+                    <div className="h-full rounded-full bg-accent transition-all" style={{ width: `${Math.max(4, p.progress * 100)}%` }} />
                   </div>
                 )}
               </div>
@@ -274,7 +296,7 @@ export default function FilePanel({
           </ul>
         ) : (
           <div className="p-4">
-            <EmptyState title={files.length ? "No files of this type" : "No files yet"}>
+            <EmptyState icon={files.length ? undefined : UploadIcon} title={files.length ? "No files of this type" : "No files yet"}>
               {canEdit && "Drag & drop STEP, STL, OBJ, PDF, DXF, images or any other files here. Dropping a file with the same name adds a new revision."}
             </EmptyState>
           </div>
@@ -287,13 +309,10 @@ export default function FilePanel({
 
 function RevBadge({ f, latest }: { f: FileRow; latest: boolean }) {
   return (
-    <span
-      className={cx("rounded px-1.5 py-0.5 font-mono text-[11px]", latest ? "bg-accent-soft text-accent" : "bg-slate-100 text-slate-500")}
-      title={latest ? "Current revision" : "Older revision"}
-    >
+    <Badge tone={latest ? "accent" : "neutral"} className="font-mono" title={latest ? "Current revision" : "Older revision"}>
       r{f.rev_number}
       {f.revision && ` · ${f.revision}`}
-    </span>
+    </Badge>
   );
 }
 
@@ -324,18 +343,23 @@ function FileItem({
   const older = group.revs.slice(1);
   return (
     <li className="group">
-      <div className="flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50">
-        <span className="text-lg" aria-hidden>
-          {KIND_ICON[f.kind]}
-        </span>
+      <div className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-slate-50/80">
+        {(() => {
+          const { icon: KindIcon, cls } = KIND_STYLE[f.kind] ?? KIND_STYLE.other;
+          return (
+            <button onClick={() => onOpen(f)} className={cx("flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ring-1 ring-inset", cls)} title="Open">
+              <KindIcon size={17} />
+            </button>
+          );
+        })()}
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <button onClick={() => onOpen(f)} className="block max-w-full truncate text-left text-sm font-medium hover:text-accent">
+            <button onClick={() => onOpen(f)} className="block max-w-full truncate text-left text-sm font-medium text-slate-900 hover:text-accent">
               {f.name}
             </button>
             {(older.length > 0 || f.revision) && <RevBadge f={f} latest />}
           </div>
-          <div className="flex flex-wrap gap-x-2 text-xs text-slate-500">
+          <div className="mt-0.5 flex flex-wrap gap-x-2 text-xs text-slate-500 tabular-nums">
             <span>{formatBytes(f.size_bytes)}</span>
             <span>{new Date(f.created_at).toLocaleDateString()}</span>
             {location && <span className="text-slate-600">· {location}</span>}
@@ -355,13 +379,13 @@ function FileItem({
               defaultValue={f.revision}
               placeholder="Label"
               title="Revision label (e.g. B, PDR, released)"
-              className="w-16 rounded border border-transparent bg-transparent px-1.5 py-0.5 text-center text-xs hover:border-slate-200 focus:border-accent focus:outline-none"
+              className="h-7 w-16 rounded-md border border-transparent bg-transparent px-1.5 text-center text-xs placeholder:text-slate-300 hover:border-slate-200 hover:bg-white focus:border-accent focus:bg-white focus:outline-none"
               onBlur={(e) => e.target.value !== f.revision && onUpdate(f.id, { revision: e.target.value })}
             />
             <select
               value={f.kind}
               onChange={(e) => group.revs.forEach((r) => onUpdate(r.id, { kind: e.target.value as FileKind }))}
-              className="rounded border border-transparent bg-transparent text-xs text-slate-500 hover:border-slate-200"
+              className="ui-select h-7 rounded-md border border-transparent bg-transparent pl-1.5 text-xs text-slate-500 hover:border-slate-200 hover:bg-white"
               title="Category"
             >
               {FILE_KINDS.map((k) => (
@@ -372,29 +396,29 @@ function FileItem({
             </select>
           </>
         ) : null}
-        <div className="flex gap-1 opacity-60 group-hover:opacity-100">
+        <div className="flex gap-0.5 opacity-50 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
           {canEdit && (
-            <Button size="sm" variant="ghost" onClick={onNewRevision} title="Upload a new revision of this file">
-              ⤴ New rev
-            </Button>
+            <IconButton onClick={onNewRevision} title="Upload a new revision of this file">
+              <FileUpIcon size={15} />
+            </IconButton>
           )}
           {canEdit && onNewRevisionFromDrive && (
-            <Button size="sm" variant="ghost" onClick={onNewRevisionFromDrive} title="New revision from Google Drive">
-              ⤴ Drive
-            </Button>
+            <IconButton onClick={onNewRevisionFromDrive} title="New revision from Google Drive">
+              <CloudIcon size={15} />
+            </IconButton>
           )}
-          <Button size="sm" variant="ghost" onClick={() => downloadFile(f).catch((e) => alert(e.message))} title="Download">
-            ⬇
-          </Button>
+          <IconButton onClick={() => downloadFile(f).catch((e) => alert(e.message))} title="Download">
+            <DownloadIcon size={15} />
+          </IconButton>
           {canEdit && (
-            <Button size="sm" variant="ghost" onClick={onDeleteAll} title={older.length ? "Delete file and all revisions" : "Delete"} className="hover:text-red-600">
-              🗑
-            </Button>
+            <IconButton tone="danger" onClick={onDeleteAll} title={older.length ? "Delete file and all revisions" : "Delete"}>
+              <TrashIcon size={15} />
+            </IconButton>
           )}
         </div>
       </div>
       {showRevs && (
-        <ul className="border-t border-slate-100 bg-slate-50/60 py-1 pr-4 pl-12">
+        <ul className="border-t border-slate-100 bg-slate-50/60 py-1.5 pr-4 pl-16">
           {older.map((r) => (
             <li key={r.id} className="flex items-center gap-2 py-1 text-xs">
               <RevBadge f={r} latest={false} />
@@ -405,13 +429,13 @@ function FileItem({
                 {formatBytes(r.size_bytes)} · {new Date(r.created_at).toLocaleString()}
               </span>
               <span className="flex-1" />
-              <Button size="sm" variant="ghost" onClick={() => downloadFile(r).catch((e) => alert(e.message))} title="Download">
-                ⬇
-              </Button>
+              <IconButton size="sm" onClick={() => downloadFile(r).catch((e) => alert(e.message))} title="Download">
+                <DownloadIcon size={14} />
+              </IconButton>
               {canEdit && (
-                <Button size="sm" variant="ghost" onClick={() => onDeleteRevision(r)} title="Delete this revision" className="hover:text-red-600">
-                  🗑
-                </Button>
+                <IconButton size="sm" tone="danger" onClick={() => onDeleteRevision(r)} title="Delete this revision">
+                  <TrashIcon size={14} />
+                </IconButton>
               )}
             </li>
           ))}

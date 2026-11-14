@@ -2,7 +2,8 @@ import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { viewerFor } from "../../shared/fileTypes";
 import { downloadFile, fetchFileBlob } from "../lib/api";
 import type { FileRow } from "../lib/types";
-import { Button, Modal, Spinner, formatBytes } from "./ui";
+import { Badge, Button, Modal, Spinner, formatBytes } from "./ui";
+import { DownloadIcon, ExternalLinkIcon } from "./icons";
 
 const ModelViewer = lazy(() => import("./viewers/ModelViewer"));
 const DxfView = lazy(() => import("./viewers/DxfView"));
@@ -17,16 +18,17 @@ export default function FileViewer({ file, onClose }: { file: FileRow | null; on
         file && (
           <div className="flex items-center gap-3">
             <span className="truncate">{file.name}</span>
-            {file.revision && <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-normal">Rev {file.revision}</span>}
-            <span className="text-xs font-normal text-slate-400">{formatBytes(file.size_bytes)}</span>
-            <Button size="sm" onClick={() => downloadFile(file)}>
-              Download
-            </Button>
+            {file.revision && <Badge>Rev {file.revision}</Badge>}
+            <span className="text-xs font-normal text-slate-400 tabular-nums">{formatBytes(file.size_bytes)}</span>
+            <span className="flex-1" />
             {file.drive_url && (
-              <a href={file.drive_url} target="_blank" rel="noreferrer" className="text-xs font-normal text-accent hover:underline">
-                Open in Drive ↗
+              <a href={file.drive_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-medium text-accent hover:underline">
+                Open in Drive <ExternalLinkIcon size={12} />
               </a>
             )}
+            <Button size="sm" onClick={() => downloadFile(file)}>
+              <DownloadIcon size={14} /> Download
+            </Button>
           </div>
         )
       }
@@ -67,7 +69,7 @@ function ViewerBody({ file }: { file: FileRow }) {
           drawings.
         </div>
         <Button variant="primary" onClick={() => downloadFile(file)}>
-          Download
+          <DownloadIcon /> Download
         </Button>
       </div>
     );

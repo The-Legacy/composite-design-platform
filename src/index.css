@@ -4,8 +4,32 @@
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
-  --color-accent: oklch(0.55 0.17 255);
-  --color-accent-soft: oklch(0.95 0.03 255);
+
+  --color-accent: oklch(0.53 0.19 262);
+  --color-accent-hover: oklch(0.48 0.19 262);
+  --color-accent-soft: oklch(0.96 0.025 262);
+  --color-accent-muted: oklch(0.9 0.05 262);
+
+  --color-canvas: oklch(0.985 0.003 260);
+
+  --shadow-card: 0 1px 2px rgb(15 23 42 / 0.04), 0 1px 1px rgb(15 23 42 / 0.02);
+  --shadow-lift: 0 4px 16px -4px rgb(15 23 42 / 0.1), 0 2px 4px -2px rgb(15 23 42 / 0.06);
+  --shadow-pop: 0 24px 48px -12px rgb(15 23 42 / 0.25), 0 0 0 1px rgb(15 23 42 / 0.05);
+
+  --animate-fade-in: fade-in 140ms ease-out;
+  --animate-pop-in: pop-in 160ms cubic-bezier(0.2, 0.9, 0.3, 1.2);
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes pop-in {
+    from {
+      opacity: 0;
+      transform: translateY(6px) scale(0.98);
+    }
+  }
 }
 
 html,
@@ -14,8 +38,35 @@ body,
   height: 100%;
 }
 body {
-  @apply bg-slate-50 text-slate-900 antialiased;
+  @apply bg-canvas text-slate-900 antialiased;
+  font-feature-settings: "cv11", "ss01", "ss03";
 }
+
+::selection {
+  background: var(--color-accent-muted);
+}
+
+/* Quiet, thin scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(148 163 184 / 0.5) transparent;
+}
+
+/* Native selects get a consistent chevron */
+select.ui-select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.5rem center;
+  background-size: 14px;
+  padding-right: 1.75rem;
+}
+
+/* Inline code chips inside prose */
+.code-chip {
+  @apply rounded bg-slate-100 px-1 py-px font-mono text-[0.85em] text-slate-700;
+}
+
 .katex {
   font-size: 1.05em;
 }

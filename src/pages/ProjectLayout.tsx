@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { NavLink, Outlet, useNavigate, useParams } from "react-router";
+import { useState, type ComponentType, type ReactNode } from "react";
+import { Link, NavLink, Outlet, useNavigate, useParams } from "react-router";
 import {
   useMaterials,
   useMyRole,
@@ -9,7 +9,8 @@ import {
   useSubsystems,
   useTableMutations,
 } from "../data/queries";
-import { Button, ErrorText, Field, Input, Modal, Select, Spinner, cx, slugify } from "../components/ui";
+import { Badge, Button, ErrorText, Field, IconButton, Input, Kbd, Modal, Select, Spinner, cx, slugify, statusDot } from "../components/ui";
+import { ChevronRightIcon, DashboardIcon, LayersIcon, PlusIcon, ScaleIcon, SearchIcon, SigmaIcon, UsersIcon } from "../components/icons";
 import TopBar from "../components/TopBar";
 import SearchPalette from "../components/SearchPalette";
 import type { Part, Subsystem } from "../lib/types";
@@ -17,9 +18,22 @@ import type { ProjectCtx } from "./projectContext";
 
 const navCls = ({ isActive }: { isActive: boolean }) =>
   cx(
-    "block truncate rounded-md px-2.5 py-1.5 text-sm",
-    isActive ? "bg-accent-soft font-medium text-accent" : "text-slate-700 hover:bg-slate-100",
+    "group flex items-center gap-2.5 truncate rounded-lg px-2.5 py-1.5 text-[13px] transition-colors",
+    isActive ? "bg-white font-medium text-slate-900 shadow-card ring-1 ring-slate-200/80" : "text-slate-600 hover:bg-slate-200/50 hover:text-slate-900",
   );
+
+function NavItem({ to, end, icon: Icon, children }: { to: string; end?: boolean; icon: ComponentType<{ size?: number; className?: string }>; children: ReactNode }) {
+  return (
+    <NavLink end={end} to={to} className={navCls}>
+      {({ isActive }) => (
+        <>
+          <Icon size={16} className={isActive ? "text-accent" : "text-slate-400 group-hover:text-slate-600"} />
+          <span className="truncate">{children}</span>
+        </>
+      )}
+    </NavLink>
+  );
+}
 
 export default function ProjectLayout() {
   const { projectId = "" } = useParams();
@@ -48,56 +62,81 @@ export default function ProjectLayout() {
     parts: parts.data ?? [],
     openNewPart: (sid) => setNewPartFor(sid ?? null),
   };
+  const base = `/p/${projectId}`;
 
   return (
     <div className="flex h-full flex-col">
-      <TopBar>
-        <span className="font-medium text-slate-800">{project.data.name}</span>
-        {role && <span className="ml-2 rounded bg-slate-100 px-1.5 py-0.5 text-xs">{role}</span>}
-        <button
-          onClick={() => window.dispatchEvent(new Event("open-search"))}
-          className="ml-4 inline-flex items-center gap-2 rounded-md border border-slate-200 px-2.5 py-1 text-xs text-slate-500 hover:border-slate-300 hover:text-slate-700"
-        >
-          Search <kbd className="rounded bg-slate-100 px-1 font-sans text-[10px]">Ctrl K</kbd>
-        </button>
+      <TopBar
+        actions={
+          <button
+            onClick={() => window.dispatchEvent(new Event("open-search"))}
+            className="hidden h-8 w-64 items-center gap-2 rounded-lg border border-slate-200 bg-slate-50/80 px-2.5 text-[13px] text-slate-400 transition hover:border-slate-300 hover:bg-white hover:text-slate-600 md:flex"
+          >
+            <SearchIcon size={14} />
+            <span className="flex-1 text-left">Search project…</span>
+            <Kbd>Ctrl K</Kbd>
+          </button>
+        }
+      >
+        <Link to="/" className="hidden text-slate-500 hover:text-slate-800 sm:inline">
+          Projects
+        </Link>
+        <ChevronRightIcon size={14} className="hidden text-slate-300 sm:block" />
+        <Link to={base} className="truncate font-medium text-slate-900">
+          {project.data.name}
+        </Link>
+        {role && (
+          <Badge tone={role === "owner" ? "accent" : "neutral"} className="capitalize">
+            {role}
+          </Badge>
+        )}
       </TopBar>
       <SearchPalette projectId={projectId} parts={ctx.parts} subsystems={ctx.subsystems} />
       <div className="flex min-h-0 flex-1">
-        <aside className="flex w-64 shrink-0 flex-col border-r border-slate-200 bg-white">
-          <nav className="flex-1 space-y-0.5 overflow-auto p-3">
-            <NavLink end to={`/p/${projectId}`} className={navCls}>
+        <aside className="flex w-64 shrink-0 flex-col border-r border-slate-200/80 bg-slate-50">
+          <nav className="flex-1 space-y-0.5 overflow-auto px-3 py-4">
+            <NavItem end to={base} icon={DashboardIcon}>
               Overview
-            </NavLink>
-            <NavLink to={`/p/${projectId}/globals`} className={navCls}>
+            </NavItem>
+            <NavItem to={`${base}/globals`} icon={SigmaIcon}>
               Project variables
-            </NavLink>
-            <NavLink to={`/p/${projectId}/materials`} className={navCls}>
+            </NavItem>
+            <NavItem to={`${base}/materials`} icon={LayersIcon}>
               Materials
-            </NavLink>
-            <NavLink to={`/p/${projectId}/rollup`} className={navCls}>
+            </NavItem>
+            <NavItem to={`${base}/rollup`} icon={ScaleIcon}>
               Mass &amp; BOM
-            </NavLink>
-            <NavLink to={`/p/${projectId}/settings`} className={navCls}>
+            </NavItem>
+            <NavItem to={`${base}/settings`} icon={UsersIcon}>
               Team &amp; settings
-            </NavLink>
+            </NavItem>
 
-            <div className="flex items-center justify-between px-2.5 pt-5 pb-1">
-              <span className="text-xs font-semibold tracking-wide text-slate-400 uppercase">Subsystems</span>
+            <div className="flex items-center justify-between px-2.5 pt-6 pb-1.5">
+              <span className="text-[11px] font-semibold tracking-wider text-slate-400 uppercase">Subsystems</span>
               {canEdit && (
-                <button className="text-xs text-accent hover:underline" onClick={() => setAddingSub(true)}>
-                  + Add
-                </button>
+                <IconButton size="sm" title="Add subsystem" onClick={() => setAddingSub(true)}>
+                  <PlusIcon size={14} />
+                </IconButton>
               )}
             </div>
             {ctx.subsystems.map((s) => (
               <SubsystemNav key={s.id} s={s} parts={ctx.parts.filter((p) => p.subsystem_id === s.id)} projectId={projectId} />
             ))}
-            {!ctx.subsystems.length && <div className="px-2.5 text-xs text-slate-400">No subsystems yet</div>}
+            {!ctx.subsystems.length && (
+              <div className="mx-1 rounded-lg border border-dashed border-slate-300 px-3 py-4 text-center text-xs text-slate-500">
+                No subsystems yet
+                {canEdit && (
+                  <button className="mt-1 block w-full font-medium text-accent hover:underline" onClick={() => setAddingSub(true)}>
+                    Add the first one
+                  </button>
+                )}
+              </div>
+            )}
           </nav>
           {canEdit && ctx.subsystems.length > 0 && (
-            <div className="border-t border-slate-200 p-3">
-              <Button size="sm" className="w-full" onClick={() => setNewPartFor(null)}>
-                + New part
+            <div className="border-t border-slate-200/80 p-3">
+              <Button variant="primary" size="sm" className="h-8 w-full" onClick={() => setNewPartFor(null)}>
+                <PlusIcon size={14} /> New part
               </Button>
             </div>
           )}
@@ -123,19 +162,26 @@ function SubsystemNav({ s, parts, projectId }: { s: Subsystem; parts: Part[]; pr
   const [open, setOpen] = useState(true);
   return (
     <div>
-      <div className="flex items-center">
-        <button className="w-5 text-xs text-slate-400" onClick={() => setOpen(!open)} aria-label="toggle">
-          {open ? "▾" : "▸"}
+      <div className="flex items-center gap-0.5">
+        <button
+          className="flex h-6 w-5 shrink-0 items-center justify-center rounded text-slate-400 hover:text-slate-700"
+          onClick={() => setOpen(!open)}
+          aria-label={open ? "Collapse" : "Expand"}
+          aria-expanded={open}
+        >
+          <ChevronRightIcon size={13} className={cx("transition-transform", open && "rotate-90")} />
         </button>
-        <NavLink to={`/p/${projectId}/s/${s.id}`} className={(a) => cx(navCls(a), "flex-1 pl-1")}>
-          {s.name}
+        <NavLink to={`/p/${projectId}/s/${s.id}`} className={(a) => cx(navCls(a), "min-w-0 flex-1 pl-1.5")}>
+          <span className="truncate">{s.name}</span>
+          {parts.length > 0 && <span className="ml-auto text-[11px] font-normal text-slate-400 tabular-nums">{parts.length}</span>}
         </NavLink>
       </div>
-      {open && (
-        <div className="ml-5 border-l border-slate-200 pl-1">
+      {open && parts.length > 0 && (
+        <div className="relative mt-0.5 mb-1 ml-[18px] space-y-px border-l border-slate-200 pl-2">
           {parts.map((p) => (
-            <NavLink key={p.id} to={`/p/${projectId}/part/${p.id}`} className={(a) => cx(navCls(a), "py-1 text-[13px]")}>
-              {p.name}
+            <NavLink key={p.id} to={`/p/${projectId}/part/${p.id}`} className={(a) => cx(navCls(a), "py-1")} title={`${p.name} · ${p.status}`}>
+              <span className={cx("h-1.5 w-1.5 shrink-0 rounded-full", statusDot(p.status))} />
+              <span className="truncate">{p.name}</span>
             </NavLink>
           ))}
         </div>
@@ -164,7 +210,7 @@ function NewSubsystemModal({ open, onClose, projectId, count }: { open: boolean;
           <Input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Airframe, Recovery, Propulsion" />
         </Field>
         <ErrorText error={create.error} />
-        <div className="flex justify-end gap-2">
+        <div className="flex justify-end gap-2 pt-2">
           <Button type="button" onClick={onClose}>
             Cancel
           </Button>
@@ -251,7 +297,7 @@ function NewPartModal({
               <span className="text-red-600">Another part or material already uses this ID</span>
             ) : (
               <>
-                Other parts reference this part's variables as <code className="font-mono">{effSlug || "id"}.variable</code>
+                Other parts reference this part's variables as <code className="code-chip">{effSlug || "id"}.variable</code>
               </>
             )
           }
@@ -269,7 +315,7 @@ function NewPartModal({
           <Input value={partNumber} onChange={(e) => setPartNumber(e.target.value)} placeholder="e.g. AF-102" />
         </Field>
         <ErrorText error={create.error} />
-        <div className="flex justify-end gap-2">
+        <div className="flex justify-end gap-2 pt-2">
           <Button type="button" onClick={onClose}>
             Cancel
           </Button>
